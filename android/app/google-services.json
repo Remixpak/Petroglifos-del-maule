@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "160959633928",
+    "project_id": "petroglifos-software",
+    "storage_bucket": "petroglifos-software.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:160959633928:android:cae4cc1c23821ea26c4fbd",
+        "android_client_info": {
+          "package_name": "com.example.software_petroglifos"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBmDHZiTpHqf1kQ99wQSRLBw4IsA0r__1k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
