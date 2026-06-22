@@ -104,8 +104,8 @@ class ControladorGestionArqueologica {
       await nuevoPetroglifo.guardarPetroglifo();
 
       // 6. Asociar al Sitio seleccionado en memoria y persistirlo en la BD
-      sitioSeleccionado.AgregarPetroglifo(nuevoPetroglifo);
-      await sitioSeleccionado.actualizarPetroglifosAsociados();
+sitioSeleccionado.AgregarPetroglifo(nuevoPetroglifo.id); // <--- CAMBIADO: .id añadido
+await sitioSeleccionado.actualizarPetroglifosAsociados();
 
       return true;
     } catch (e) {
@@ -181,18 +181,17 @@ class ControladorGestionArqueologica {
         );
 
         return Sitio(
-          id: data['id'] ?? '',
-          nombre: data['nombre'] ?? '',
-          codigoInterno: data['codigoInterno'] ?? '',
-          comuna: data['comuna'] ?? '',
-          descripcion: data['descripcion'] ?? '',
-          estadoAcceso: estadoEnum,
-          latitud: (data['latitud'] as num?)?.toDouble() ?? 0.0,
-          longitud: (data['longitud'] as num?)?.toDouble() ?? 0.0,
-          // Nota: Los petroglifos completos se cargarían aquí si fuera necesario,
-          // por ahora inicializamos la lista vacía o con datos mínimos
-          petroglifos: [], 
-        );
+  id: data['id'] ?? '',
+  nombre: data['nombre'] ?? '',
+  codigoInterno: data['codigoInterno'] ?? '',
+  comuna: data['comuna'] ?? '',
+  descripcion: data['descripcion'] ?? '',
+  estadoAcceso: estadoEnum,
+  latitud: (data['latitud'] as num?)?.toDouble() ?? 0.0,
+  longitud: (data['longitud'] as num?)?.toDouble() ?? 0.0,
+  // CAMBIADO: Usamos el nuevo parámetro y transformamos de forma segura la data de Firebase a una Lista de Strings
+  petroglifosIds: List<String>.from(data['petroglifosIds'] ?? []), 
+);
       }).toList();
     });
   }

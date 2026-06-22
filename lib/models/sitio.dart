@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'petroglifo.dart';
 
 enum EstadoAcceso { publico, privado }
 
@@ -12,7 +11,8 @@ class Sitio {
   final EstadoAcceso estadoAcceso;
   final double latitud;
   final double longitud;
-  final List<Petroglifo> petroglifos;
+  
+  final List<String> petroglifosIds; 
 
   Sitio({
     required this.id,
@@ -23,10 +23,10 @@ class Sitio {
     required this.estadoAcceso,
     required this.latitud,
     required this.longitud,
-    List<Petroglifo>? petroglifos,
-  }) : petroglifos = petroglifos ?? [];
+    List<String>? petroglifosIds, // Modificado aquí también
+  }) : petroglifosIds = petroglifosIds ?? [];
 
-  //metodo de persistencia interno delegando a Firebase Cloud Firestore
+  // método de persistencia interno delegando a Firebase Cloud Firestore
   Future<void> guardarSitio() async {
     final FirebaseFirestore firestore = FirebaseFirestore.instance;
     
@@ -39,31 +39,32 @@ class Sitio {
       'estadoAcceso': estadoAcceso.name,
       'latitud': latitud,
       'longitud': longitud,
-      
-      'petroglifosIds': petroglifos.map((p) => p.id).toList(),
+      'petroglifosIds': petroglifosIds, // Ahora es directo, no necesita mapeo
     });
   }
 
   void editarSitio(String nuevoNombre, String nuevaDescripcion, String nuevoEstadoAcceso) {}
   void eliminarSitio() {}
-  void AgregarPetroglifo(Petroglifo petroglifo) {
-    petroglifos.add(petroglifo);
+  
+  //  MODIFICADO: Ahora solo añade el ID como String
+  void AgregarPetroglifo(String petroglifoId) {
+    if (!petroglifosIds.contains(petroglifoId)) {
+      petroglifosIds.add(petroglifoId);
+    }
   }
+
   Future<void> actualizarPetroglifosAsociados() async {
     final FirebaseFirestore firestore = FirebaseFirestore.instance;
     await firestore.collection('sitios').doc(id).update({
-      'petroglifosIds': petroglifos.map((p) => p.id).toList(),
+      'petroglifosIds': petroglifosIds,
     });
   }
 
-  // Dentro de tu clase Sitio en sitio.dart:
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Sitio && runtimeType == other.runtimeType && id == other.id;
 
-@override
-bool operator ==(Object other) =>
-    identical(this, other) ||
-    other is Sitio && runtimeType == other.runtimeType && id == other.id;
-
-@override
-int get hashCode => id.hashCode;
+  @override
+  int get hashCode => id.hashCode;
 }
-

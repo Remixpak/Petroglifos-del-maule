@@ -53,10 +53,10 @@ class _PantallaListarSitiosState extends State<PantallaListarSitios> {
           }
 
           return ListView.builder(
-            padding: EdgeInsets.symmetric(horizontal: paddingHorizontal, vertical: 12.0),
-            itemCount: sitios.length,
-            itemBuilder: (context, index) {
-              final sitio = sitios[index];
+  padding: EdgeInsets.symmetric(horizontal: paddingHorizontal, vertical: 12.0),
+  itemCount: sitios.length,
+  itemBuilder: (context, index) { 
+    final sitio = sitios[index];
               
               // Verificamos si las coordenadas deben protegerse
               final bool esPrivado = sitio.estadoAcceso == EstadoAcceso.privado;
@@ -93,7 +93,7 @@ class _PantallaListarSitiosState extends State<PantallaListarSitios> {
                             Text('Acceso: ${sitio.estadoAcceso.name}'),
                             const SizedBox(height: 6),
                             
-                            // MODIFICADO: Muestra las coordenadas solo si el acceso NO es privado
+                            // Muestra las coordenadas solo si el acceso NO es privado
                             if (!esPrivado) ...[
                               Text('Coordenadas GPS: ${sitio.latitud}, ${sitio.longitud}'),
                             ] else ...[
@@ -112,22 +112,25 @@ class _PantallaListarSitiosState extends State<PantallaListarSitios> {
                             ),
                             const SizedBox(height: 6),
                             
-                            // Si la lista de petroglifos está vacía en este sitio
-                            sitio.petroglifos.isEmpty
+                            //  MODIFICADO: Ahora evalúa 'sitio.petroglifosIds' en lugar del viejo 'sitio.petroglifos'
+                            sitio.petroglifosIds.isEmpty
                                 ? const Padding(
                                     padding: EdgeInsets.only(left: 8.0, top: 4.0),
                                     child: Text('Ningún petroglifo asociado aún.', style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey)),
                                   )
                                 : Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: sitio.petroglifos.map((petroglifo) {
+                                    //  MODIFICADO: Mapea la lista de IDs (Strings) directamente
+                                    children: sitio.petroglifosIds.map((idPetroglifo) {
                                       return Padding(
                                         padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
                                         child: Row(
                                           children: [
                                             const Icon(Icons.blur_on_rounded, size: 16, color: Colors.orange),
                                             const SizedBox(width: 8),
-                                            Text(petroglifo.nombre, style: const TextStyle(fontSize: 14)),
+                                            // Como solo tenemos el ID guardado en la relación del Sitio, 
+                                            // mostramos el ID o un texto identificador corto por ahora.
+                                            Text('ID Petroglifo: $idPetroglifo', style: const TextStyle(fontSize: 14)),
                                           ],
                                         ),
                                       );
