@@ -1,49 +1,66 @@
-import 'package:flutter/material.dart';
-import 'package:software_petroglifos/models/fichaTecnica.dart';
+import 'dart:convert';
+import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:software_petroglifos/models/archivoMultimedia.dart';
 import 'package:software_petroglifos/models/imagen.dart';
+
 class Petroglifo {
   final String id;
   final String nombre;
-  //final FichaTecnica fichaTecnica;
-/*al momento de registrar el petroglifo se rellena tambien la ficha tecnica, asi que se guarda
-primero la ficha y se le asigna al petroglifo
-*/
-  final List<archivoMultimedia> archivosMultimedia; // Lista de archivos multimedia asociados al petroglifo
-  final List<imagen> imagenes; // Lista de imágenes asociadas al petroglifo
+  final List<archivoMultimedia> archivosMultimedia;
+  final List<imagen> imagenes;
+
+  // Mapa temporal o atributo para almacenar las imágenes en Base64 antes de subirlas
+  Map<String, String> imagenesBase64 = {};
+
   Petroglifo({
     required this.id,
     required this.nombre,
-    //required this.fichaTecnica,
     List<archivoMultimedia>? archivosMultimedia,
     List<imagen>? imagenes,
   })  : archivosMultimedia = archivosMultimedia ?? [],
-       imagenes = imagenes ?? [];
+        imagenes = imagenes ?? [];
 
-  void agregarArchivoMultimedia(archivoMultimedia archivo) {
-    archivosMultimedia.add(archivo);
-  }
-  void eliminarArchivoMultimedia(String idArchivo) {
-    archivosMultimedia.removeWhere((archivo) => archivo.id == idArchivo);
-  }
-  void guardarPetroglifo() {
-    // Lógica para guardar el petroglifo en la base de datos o almacenamiento local
-  }
-  void editarPetroglifo(String nuevoNombre, FichaTecnica nuevaFichaTecnica) {
-    // Lógica para editar el petroglifo, actualizando su nombre y ficha técnica
-  }
-  void eliminarPetroglifo() {
-    // Lógica para eliminar el petroglifo de la base de datos o almacenamiento local
-  }
-  imagen ObtenerImagenPrincipal() {
-    // Lógica para obtener la imagen principal del petroglifo, por ejemplo, el primer archivo multimedia de tipo imagen
-    if (imagenes.isEmpty) {
-      throw StateError('No hay imágenes disponibles');
+  //transformacion de Ronald: Convierte archivos fisicos a cadenas Base64
+  Future<void> transformacionDeRonald(List<File> archivosFotos) async {
+    for (int i = 0; i < archivosFotos.length; i++) {
+      List<int> imageBytes = await archivosFotos[i].readAsBytes();
+      String base64String = base64Encode(imageBytes);
+      //asignamos la cadena Base64 correspondiente al ID de la imagen del modelo
+      if (i < imagenes.length) {
+        imagenesBase64[imagenes[i].id] = base64String;
+      }
     }
-    // Buscamos el archivo marcado como principal, si no existe, tomamos el primero
-    return imagenes.firstWhere(
-      (imagen) => imagen.isPrincipal,
-      orElse: () => imagenes.first,
-    );
+  }
+
+  /// Método de persistencia que interactúa con la base de datos
+  Future<void> guardarPetroglifo() async {
+    final FirebaseFirestore firestore = FirebaseFirestore.instance;
+
+    await firestore.collection('petroglifos').doc(id).set({
+      'id': id,
+      'nombre': nombre,
+      'imagenes': imagenes.map((img) => {
+        'id': img.id,
+        'nombreArchivo': img.nombreArchivo,
+        'tipoArchivo': img.tipoArchivo,
+        'isPrincipal': img.isPrincipal,
+        // Almacenamos la imagen transformada en formato Base64 en lugar de una URL remota
+        'base64Data': imagenesBase64[img.id] ?? '', 
+      }).toList(),
+      'archivosMultimedia': archivosMultimedia.map((arc) => {
+        'id': arc.id,
+        'nombreArchivo': arc.nombreArchivo,
+        'tipoArchivo': arc.tipoArchivo,
+        'rutaArchivo': arc.rutaArchivo,
+      }).toList(),
+    });
+  }
+
+  void agregarArchivoMultimedia(archivoMultimedia archivo) => archivosMultimedia.add(archivo);
+  
+  imagen obtenerImagenPrincipal() {
+    if (imagenes.isEmpty) throw StateError('No hay imágenes disponibles');
+    return imagenes.firstWhere((img) => img.isPrincipal, orElse: () => imagenes.first);
   }
 }

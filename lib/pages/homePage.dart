@@ -1,14 +1,10 @@
+import 'dart:convert'; // Para decodificar Base64 si fuese necesario
 import 'package:flutter/material.dart';
 import 'package:software_petroglifos/controllers/controladorGestionArqueologica.dart';
 import 'package:software_petroglifos/models/petroglifo.dart';
 import 'package:software_petroglifos/pages/PantallaDeRegistro.dart';
-
-/*
-Este archivo es el de la pagina principal, se conecta al controlador de gestion
-arqueologica para listar todos los petroglifos del sistema.
-(REVISAR ESTO PARA MAS ADELANTE)
-deberia tener conexión con la pagina de detalles del petroglifo, y con la pagina de agregar nuevo petroglifo.
-*/
+import 'package:software_petroglifos/pages/pantallaSitios.dart';
+import 'package:software_petroglifos/pages/formularioPetroglifos.dart';
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.title});
@@ -20,30 +16,52 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   final ControladorGestionArqueologica _controlador = ControladorGestionArqueologica();
-  List<Petroglifo> _petroglifos = [];
+  
+  // Controla cuál botón de la barra inferior está seleccionado (0: Petroglifos por defecto)
+  int _indiceActual = 0;
 
-  @override
-  void initState() {
-    super.initState();
-    _cargarPetroglifos();
-  }
-
-  void _cargarPetroglifos() {
-    setState(() {
-      _petroglifos = _controlador.listarPetroglifos();
-    });
-  }
-
-  // Método encargado de gestionar la navegación hacia el registro de usuarios
   void _irARegistroUsuario() {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const PantallaRegistro()),
     );
-    
-    
-    // Print temporal para verificar en consola que el botón funciona al presionarlo
     print("Navegando a la pantalla de registro de usuarios...");
+  }
+
+  void _irARegistroPetroglifo() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const formularioPetroglifo()),
+    );
+    print("Navegando a la pantalla de registro de petroglifos...");
+  }
+
+  // ==========================================
+  // MÉTODOS DE NAVEGACIÓN PARA LA BARRA INFERIOR
+  // ==========================================
+
+  void _irAPetroglifos() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const formularioPetroglifo()),
+    );
+    print("Cargando vista de Petroglifos...");
+  }
+
+  void _irASitios() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const PantallaListarSitios()),
+    ).then((_) {
+      // Al volver de sitios, restauramos el índice en 0 (Petroglifos) para mantener la consistencia visual
+      setState(() => _indiceActual = 0);
+    });
+    print("Navegando a la pantalla de Sitios Arqueológicos...");
+  }
+
+  void _irABitacoras() {
+    print("Navegando a la pantalla de Bitácoras...");
+    setState(() => _indiceActual = 0); // Restaurar índice si no hay pantalla aún
   }
 
   @override
@@ -64,87 +82,151 @@ class _MyHomePageState extends State<MyHomePage> {
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: Text(widget.title),
         actions: [
-          // NUEVO: Botón para ir al registro de usuarios
           IconButton(
             icon: const Icon(Icons.person_add_alt_1_rounded),
             tooltip: 'Registrar Usuario',
-            onPressed: _irARegistroUsuario, // Llama al método con el cuerpo comentado
-          ),
-          // Botón para refrescar manualmente
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Refrescar',
-            onPressed: _cargarPetroglifos,
+            onPressed: _irARegistroUsuario,
           ),
         ],
       ),
-      body: _petroglifos.isEmpty
-          ? const Center(
+      
+      // CAMBIO CLAVE: Envolver el GridView dentro de un StreamBuilder reactivo
+      body: StreamBuilder<List<Petroglifo>>(
+        stream: _controlador.listarPetroglifos(), // Escucha Firestore en tiempo real
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.hasError) {
+            return Center(child: Text('Error al cargar petroglifos: ${snapshot.error}'));
+          }
+
+          final petroglifos = snapshot.data ?? [];
+
+          if (petroglifos.isEmpty) {
+            return const Center(
               child: Text(
                 'No hay registros',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-            )
-          : Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: GridView.builder(
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: crossAxisCount,
-                  crossAxisSpacing: 12.0,
-                  mainAxisSpacing: 12.0,
-                  childAspectRatio: 0.85, 
-                ),
-                itemCount: _petroglifos.length,
-                itemBuilder: (context, index) {
-                  final petroglifo = _petroglifos[index];
-                  String imageUrl = '';
-                  
-                  try {
-                    imageUrl = petroglifo.ObtenerImagenPrincipal().url ?? '';
-                  } catch (e) {
-                    imageUrl = ''; 
-                  }
+            );
+          }
 
-                  return Card(
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(
-                          child: ClipRRect(
-                            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                            child: imageUrl.isNotEmpty
-                                ? Image.network(
-                                    imageUrl,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, size: 50),
-                                  )
-                                : const Icon(Icons.image_not_supported, size: 50),
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(12.0),
-                          key: ValueKey(petroglifo.id),
-                          child: Text(
-                            petroglifo.nombre,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            textAlign: TextAlign.center,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
+          return Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: GridView.builder(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: crossAxisCount,
+                crossAxisSpacing: 12.0,
+                mainAxisSpacing: 12.0,
+                childAspectRatio: 0.85, 
               ),
+              itemCount: petroglifos.length,
+              itemBuilder: (context, index) {
+                final petroglifo = petroglifos[index];
+                String imageUrl = '';
+                bool esBase64 = false;
+                
+                try {
+                  final imgPrincipal = petroglifo.obtenerImagenPrincipal();
+                  imageUrl = imgPrincipal.url; // Contiene la URL o la data Base64
+                  // Si el string empieza con la cabecera típica o no es un link HTTP, es Base64
+                  esBase64 = !imageUrl.startsWith('http');
+                } catch (e) {
+                  imageUrl = ''; 
+                }
+
+                return Card(
+                  elevation: 4,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                          child: imageUrl.isNotEmpty
+                              ? (esBase64 
+                                  ? Image.memory(
+                                      base64Decode(imageUrl),
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, size: 50),
+                                    )
+                                  : Image.network(
+                                      imageUrl,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, size: 50),
+                                    ))
+                              : const Icon(Icons.image_not_supported, size: 50),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        key: ValueKey(petroglifo.id),
+                        child: Text(
+                          petroglifo.nombre,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
+          );
+        },
+      ),
+
+      // Botón flotante para añadir petroglifos directamente desde el Home
+      floatingActionButton: FloatingActionButton(
+        onPressed: _irARegistroPetroglifo,
+        tooltip: 'Registrar Petroglifo',
+        child: const Icon(Icons.add),
+      ),
+      
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _indiceActual,
+        onDestinationSelected: (int index) {
+          setState(() {
+            _indiceActual = index;
+          });
+
+          switch (index) {
+            case 0:
+              _irAPetroglifos();
+              break;
+            case 1:
+              _irASitios();
+              break;
+            case 2:
+              _irABitacoras();
+              break;
+          }
+        },
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.landscape_rounded),
+            label: 'Petroglifos',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.place_rounded),
+            label: 'Sitios',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.book_rounded),
+            label: 'Bitácoras',
+          ),
+        ],
+      ),
     );
   }
 }

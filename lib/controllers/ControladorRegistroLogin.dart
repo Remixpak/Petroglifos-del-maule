@@ -6,8 +6,9 @@ class Controladorregistrologin {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // El método ahora es un Future<bool> para avisarle a la vista si se registró con éxito
+  //Transladar este metodo luego a la clase usuario
   Future<bool> registrarUsuario({
+
     required String nombre,
     required String correo,
     required String clave,
@@ -32,7 +33,6 @@ class Controladorregistrologin {
         'estado': true, // Por defecto activo
         'rol': rol.name, // Guardamos el enum como String ('Administrador' o 'Investigador')
         'institucion': institucion.trim(),
-        'fechaCreacion': FieldValue.serverTimestamp(),
       });
 
       print('Usuario registrado con éxito en Auth y Firestore UID: $uid');
@@ -42,4 +42,9 @@ class Controladorregistrologin {
       return false;
     }
   }
+  
+
+
+
+
 }
