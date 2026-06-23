@@ -5,6 +5,7 @@ import 'package:software_petroglifos/models/petroglifo.dart';
 import 'package:software_petroglifos/pages/PantallaDeRegistro.dart';
 import 'package:software_petroglifos/pages/pantallaSitios.dart';
 import 'package:software_petroglifos/pages/formularioPetroglifos.dart';
+import 'package:software_petroglifos/pages/formularioRegistro.dart';
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.title});
@@ -43,7 +44,8 @@ class _MyHomePageState extends State<MyHomePage> {
   void _irAPetroglifos() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const formularioPetroglifo()),
+      //MaterialPageRoute(builder: (context) => const formularioPetroglifo()),
+      MaterialPageRoute(builder: (context) => const FormularioRegistro("Petroglifo", tipo: TipoRegistro.petroglifo)),
     );
     print("Cargando vista de Petroglifos...");
   }

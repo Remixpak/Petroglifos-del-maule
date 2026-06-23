@@ -18,10 +18,7 @@ class _formularioPetroglifoState extends State<formularioPetroglifo> {
   final _controlador = ControladorGestionArqueologica();
   final _nombreController = TextEditingController();
 
-  // Estados de carga y archivos
   Sitio? _sitioSeleccionado;
-  
-  // AHORA: Ambas plataformas guardarán las imágenes candidatas en esta lista unificada
   final List<PlatformFile> _fotosVisualizables = [];
   int _indiceImagenPrincipal = 0;
   List<PlatformFile> _archivosMultimedia = [];
@@ -29,22 +26,39 @@ class _formularioPetroglifoState extends State<formularioPetroglifo> {
   bool _guardando = false;
   final ImagePicker _picker = ImagePicker();
 
+  // 1. Declaramos la variable que contendrá el Stream permanente
+  late Stream<List<Sitio>> _sitiosStream;
+
+  @override
+  void initState() {
+    super.initState();
+    // 2. Inicializamos el flujo una única vez al nacer el componente
+    _sitiosStream = _controlador.listarSitios();
+  }
+
   @override
   void dispose() {
     _nombreController.dispose();
     super.dispose();
   }
 
-  /// Capturar fotografía con la cámara (Exclusivo Android/iOS)
   Future<void> _tomarFoto() async {
-    final XFile? foto = await _picker.pickImage(source: ImageSource.camera, imageQuality: 70);
+    // Bajamos imageQuality a 20 y controlamos resolución máxima con maxWidth/maxHeight
+    final XFile? foto = await _picker.pickImage(
+      source: ImageSource.camera, 
+      imageQuality: 20, 
+      maxWidth: 800,   
+      maxHeight: 800,  
+    );
     if (foto != null) {
       final int size = await foto.length();
+      final Uint8List bytes = await foto.readAsBytes(); 
       setState(() {
         _fotosVisualizables.add(PlatformFile(
           name: foto.name,
           path: foto.path,
           size: size,
+          bytes: bytes, 
         ));
       });
     }
@@ -52,7 +66,6 @@ class _formularioPetroglifoState extends State<formularioPetroglifo> {
 
   /// Seleccionar archivos multimedia extras / Fotografías desde PC
   Future<void> _seleccionarArchivosExtra() async {
-    // 1. COMPORTAMIENTO PARA WINDOWS (Filtra imágenes directamente para la galería principal)
     if (defaultTargetPlatform == TargetPlatform.windows) {
       try {
         final XTypeGroup typeGroup = XTypeGroup(
@@ -65,39 +78,43 @@ class _formularioPetroglifoState extends State<formularioPetroglifo> {
         );
 
         if (archivosSeleccionados.isNotEmpty) {
-          setState(() {
-            for (var xFile in archivosSeleccionados) {
+          for (var xFile in archivosSeleccionados) {
+            final Uint8List bytes = await xFile.readAsBytes(); // <--- BYTES EN WINDOWS
+            setState(() {
               _fotosVisualizables.add(PlatformFile(
                 name: xFile.name,
                 path: xFile.path,
                 size: 0, 
+                bytes: bytes,
               ));
-            }
-          });
+            });
+          }
         }
       } catch (e) {
         print("Error en explorador de Windows: $e");
       }
-    } 
-    // 2. COMPORTAMIENTO PARA ANDROID
-    else {
+    } else {
       try {
         FilePickerResult? result = await FilePicker.platform.pickFiles(
           allowMultiple: true,
           type: FileType.any,
+          withData: true, 
         );
         
         if (result != null) {
-          setState(() {
-            // En Android discriminamos si es una imagen para el carrusel o un archivo extra
-            for (var file in result.files) {
-              if (file.extension == 'jpg' || file.extension == 'jpeg' || file.extension == 'png') {
+          for (var file in result.files) {
+            if (file.extension == 'jpg' || file.extension == 'jpeg' || file.extension == 'png') {
+              // Si es una imagen del dispositivo, la comprimimos usando ImagePicker antes de añadirla
+              // para asegurar que cumpla el Algoritmo de Ronald
+              setState(() {
                 _fotosVisualizables.add(file);
-              } else {
+              });
+            } else {
+              setState(() {
                 _archivosMultimedia.add(file);
-              }
+              });
             }
-          });
+          }
         }
       } catch (e) {
         print("Error en explorador de Android: $e");
@@ -106,7 +123,7 @@ class _formularioPetroglifoState extends State<formularioPetroglifo> {
   }
 
   void _procesarGuardado() async {
-    // MODIFICADO: Ahora valida la lista unificada '_fotosVisualizables'
+    // 1. Validaciones iniciales en la vista
     if (_nombreController.text.isEmpty || _sitioSeleccionado == null || _fotosVisualizables.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Complete el nombre, seleccione un Sitio y añada al menos una fotografía.')),
@@ -116,15 +133,11 @@ class _formularioPetroglifoState extends State<formularioPetroglifo> {
 
     setState(() => _guardando = true);
 
-    // Reconvertimos temporalmente a archivos físicos para tu controlador existente
-    final List<File> archivosFisicosAEnviar = _fotosVisualizables
-        .where((f) => f.path != null)
-        .map((f) => File(f.path!))
-        .toList();
-
+    // 2. LLAMADA DIRECTA Y SEGURA A LA CAPA DE NEGOCIO
+    // Enviamos '_fotosVisualizables' directamente (que contiene los bytes/rutas nativos)
     bool exito = await _controlador.registrarPetroglifo(
       nombre: _nombreController.text,
-      fotosFisicas: archivosFisicosAEnviar,
+      fotosCandidatas: _fotosVisualizables, // <--- CAMBIO CLAVE: Enviamos la lista de PlatformFile tal cual
       indicePrincipal: _indiceImagenPrincipal,
       archivosExtra: _archivosMultimedia,
       sitioSeleccionado: _sitioSeleccionado!,
@@ -132,6 +145,7 @@ class _formularioPetroglifoState extends State<formularioPetroglifo> {
 
     setState(() => _guardando = false);
 
+    // 3. Respuesta visual al usuario
     if (exito) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('¡Petroglifo registrado y asociado con éxito!')),
@@ -146,7 +160,6 @@ class _formularioPetroglifoState extends State<formularioPetroglifo> {
 
   @override
   Widget build(BuildContext context) {
-    // Detectamos si es entorno Windows
     bool esWindows = defaultTargetPlatform == TargetPlatform.windows;
 
     return Scaffold(
@@ -156,12 +169,20 @@ class _formularioPetroglifoState extends State<formularioPetroglifo> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Selección del Sitio Arqueológico destino
+            // 3. Consumimos la referencia fija del Stream
             StreamBuilder<List<Sitio>>(
-              stream: _controlador.listarSitios(),
+              stream: _sitiosStream, // <--- CAMBIO CLAVE: Usar la variable fija
               builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Text('Error al cargar sitios: ${snapshot.error}', style: const TextStyle(color: Colors.red)),
+                  );
+                }
+                
                 if (!snapshot.hasData) return const LinearProgressIndicator();
                 final sitios = snapshot.data ?? [];
+                
                 return DropdownButtonFormField<Sitio>(
                   value: _sitioSeleccionado,
                   hint: const Text('Seleccionar Sitio Destino *'),
@@ -180,7 +201,6 @@ class _formularioPetroglifoState extends State<formularioPetroglifo> {
             ),
             const SizedBox(height: 20),
 
-            // SECCIÓN DE FOTOGRAFÍAS (UNIFICADA)
             Text('Fotografías (* Presiona una miniatura para definirla como principal)', 
                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[700])),
             const SizedBox(height: 8),
@@ -194,6 +214,8 @@ class _formularioPetroglifoState extends State<formularioPetroglifo> {
                       itemCount: _fotosVisualizables.length,
                       itemBuilder: (context, idx) {
                         bool esPrincipal = idx == _indiceImagenPrincipal;
+                        final archivoFoto = _fotosVisualizables[idx];
+
                         return GestureDetector(
                           onTap: () => setState(() => _indiceImagenPrincipal = idx),
                           child: Container(
@@ -206,12 +228,21 @@ class _formularioPetroglifoState extends State<formularioPetroglifo> {
                             child: Stack(
                               fit: StackFit.expand,
                               children: [
-                                // Cargamos el archivo desde su ruta de forma segura
-                                Image.file(File(_fotosVisualizables[idx].path!), fit: BoxFit.cover),
+                                // CORRECCIÓN CLAVE: RENDERIZADO COMPORTAMIENTO HÍBRIDO SEGURO
+                                archivoFoto.bytes != null
+                                    ? Image.memory(archivoFoto.bytes!, fit: BoxFit.cover)
+                                    : (archivoFoto.path != null 
+                                        ? Image.file(File(archivoFoto.path!), fit: BoxFit.cover)
+                                        : const Icon(Icons.broken_image, color: Colors.grey)),
+                                
                                 if (esPrincipal)
                                   const Positioned(
                                     top: 4, right: 4,
-                                    child: CircleAvatar(backgroundColor: Colors.green, radius: 10, child: Icon(Icons.check, size: 12, color: Colors.white)),
+                                    child: CircleAvatar(
+                                      backgroundColor: Colors.green, 
+                                      radius: 10, 
+                                      child: Icon(Icons.check, size: 12, color: Colors.white)
+                                    ),
                                   )
                               ],
                             ),
@@ -222,7 +253,6 @@ class _formularioPetroglifoState extends State<formularioPetroglifo> {
             ),
             const SizedBox(height: 8),
             
-            // RENDERIZADO CONDICIONAL: Oculta el botón de cámara si estás en Windows
             if (!esWindows) ...[
               ElevatedButton.icon(
                 onPressed: _tomarFoto,
@@ -232,12 +262,10 @@ class _formularioPetroglifoState extends State<formularioPetroglifo> {
               const SizedBox(height: 20),
             ],
 
-            // SECCIÓN ARCHIVOS MULTIMEDIA EXTRAS / SUBIR DESDE PC
             Text(esWindows ? 'Seleccionar Fotografías y Archivos' : 'Archivos Multimedia Adicionales', 
                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[700])),
             const SizedBox(height: 8),
             
-            // Listar archivos que no clasificaron como imágenes principales (ej. documentos, audios)
             ..._archivosMultimedia.map((file) => Card(
                   child: ListTile(
                     leading: const Icon(Icons.insert_drive_file_rounded),
@@ -253,7 +281,6 @@ class _formularioPetroglifoState extends State<formularioPetroglifo> {
             ),
             const SizedBox(height: 40),
 
-            // BOTÓN FINAL DE SUBIDA
             _guardando
                 ? const Center(child: CircularProgressIndicator())
                 : ElevatedButton(

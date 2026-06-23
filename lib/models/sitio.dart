@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 enum EstadoAcceso { publico, privado }
 
 class Sitio {
@@ -11,7 +9,6 @@ class Sitio {
   final EstadoAcceso estadoAcceso;
   final double latitud;
   final double longitud;
-  
   final List<String> petroglifosIds; 
 
   Sitio({
@@ -23,14 +20,17 @@ class Sitio {
     required this.estadoAcceso,
     required this.latitud,
     required this.longitud,
-    List<String>? petroglifosIds, // Modificado aquí también
+    List<String>? petroglifosIds,
   }) : petroglifosIds = petroglifosIds ?? [];
 
-  // método de persistencia interno delegando a Firebase Cloud Firestore
-  Future<void> guardarSitio() async {
-    final FirebaseFirestore firestore = FirebaseFirestore.instance;
-    
-    await firestore.collection('sitios').doc(id).set({
+  void AgregarPetroglifo(String petroglifoId) {
+    if (!petroglifosIds.contains(petroglifoId)) {
+      petroglifosIds.add(petroglifoId);
+    }
+  }
+
+  Map<String, dynamic> toFirestore() {
+    return {
       'id': id,
       'nombre': nombre,
       'codigoInterno': codigoInterno,
@@ -39,25 +39,8 @@ class Sitio {
       'estadoAcceso': estadoAcceso.name,
       'latitud': latitud,
       'longitud': longitud,
-      'petroglifosIds': petroglifosIds, // Ahora es directo, no necesita mapeo
-    });
-  }
-
-  void editarSitio(String nuevoNombre, String nuevaDescripcion, String nuevoEstadoAcceso) {}
-  void eliminarSitio() {}
-  
-  //  MODIFICADO: Ahora solo añade el ID como String
-  void AgregarPetroglifo(String petroglifoId) {
-    if (!petroglifosIds.contains(petroglifoId)) {
-      petroglifosIds.add(petroglifoId);
-    }
-  }
-
-  Future<void> actualizarPetroglifosAsociados() async {
-    final FirebaseFirestore firestore = FirebaseFirestore.instance;
-    await firestore.collection('sitios').doc(id).update({
       'petroglifosIds': petroglifosIds,
-    });
+    };
   }
 
   @override

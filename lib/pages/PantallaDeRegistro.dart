@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:software_petroglifos/controllers/ControladorRegistroLogin.dart';
-import 'package:software_petroglifos/models/usuario.dart'; // Ajusta a tu modelo
+import 'package:software_petroglifos/models/usuario.dart';
+
+/////////////////////////////////////////////////////////
+///Forumulario de registro de usuarios
+///////////////////////////////////////////////////////
 
 class PantallaRegistro extends StatefulWidget {
   const PantallaRegistro({super.key});

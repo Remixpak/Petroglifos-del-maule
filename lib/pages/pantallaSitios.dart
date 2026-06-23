@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:software_petroglifos/controllers/controladorGestionArqueologica.dart';
 import 'package:software_petroglifos/models/sitio.dart';
-import 'package:software_petroglifos/pages/formularioSitios.dart'; // Ajusta la ruta real
+import 'package:software_petroglifos/pages/formularioSitios.dart';
+import 'package:software_petroglifos/pages/formularioRegistro.dart';
 
 class PantallaListarSitios extends StatefulWidget {
   const PantallaListarSitios({super.key});
@@ -16,7 +17,7 @@ class _PantallaListarSitiosState extends State<PantallaListarSitios> {
   void _irARegistroSitio() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const PantallaRegistroSitio()),
+      MaterialPageRoute(builder: (context) => const FormularioRegistro("Sitio", tipo: TipoRegistro.sitio)),
     );
   }
 
