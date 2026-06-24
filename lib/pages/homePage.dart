@@ -2,12 +2,12 @@ import 'dart:convert'; // Para decodificar Base64 si fuese necesario
 import 'package:flutter/material.dart';
 import 'package:software_petroglifos/controllers/controladorGestionArqueologica.dart';
 import 'package:software_petroglifos/models/petroglifo.dart';
-import 'package:software_petroglifos/pages/PantallaDeRegistro.dart';
 import 'package:software_petroglifos/pages/pantallaSitios.dart';
 
 import 'package:software_petroglifos/pages/formularioRegistro.dart';
-// Añade la importación de la pantalla de detalle al inicio del archivo
 import 'package:software_petroglifos/pages/detallePetroglifo.dart';
+import 'package:software_petroglifos/pages/pantallaBitacora.dart';
+import 'package:software_petroglifos/pages/pantallaReportes.dart';
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.title});
@@ -23,19 +23,21 @@ class _MyHomePageState extends State<MyHomePage> {
   // Controla cuál botón de la barra inferior está seleccionado (0: Petroglifos por defecto)
   int _indiceActual = 0;
 
-  void _irARegistroUsuario() {
+  /*void _irARegistroUsuario() {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const PantallaRegistro()),
     );
     print("Navegando a la pantalla de registro de usuarios...");
-  }
+  }*/
 
   void _irARegistroPetroglifo() {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const FormularioRegistro("Petroglifo", tipo: TipoRegistro.petroglifo)),
-    );
+    ).then((_) {
+      setState(() => _indiceActual = 0);
+    });
     print("Navegando a la pantalla de registro de petroglifos...");
   }
 
@@ -43,29 +45,35 @@ class _MyHomePageState extends State<MyHomePage> {
   // MÉTODOS DE NAVEGACIÓN PARA LA BARRA INFERIOR
   // ==========================================
 
-  void _irAPetroglifos() {
-    Navigator.push(
-      context,
-      //MaterialPageRoute(builder: (context) => const formularioPetroglifo()),
-      MaterialPageRoute(builder: (context) => const FormularioRegistro("Petroglifo", tipo: TipoRegistro.petroglifo)),
-    );
-    print("Cargando vista de Petroglifos...");
-  }
-
   void _irASitios() {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const PantallaListarSitios()),
     ).then((_) {
-      // Al volver de sitios, restauramos el índice en 0 (Petroglifos) para mantener la consistencia visual
+      // Al volver, restauramos el índice en 0 (Petroglifos) para mantener la consistencia visual
       setState(() => _indiceActual = 0);
     });
     print("Navegando a la pantalla de Sitios Arqueológicos...");
   }
 
   void _irABitacoras() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const PantallaListarBitacoras()),
+    ).then((_) {
+      setState(() => _indiceActual = 0);
+    });
     print("Navegando a la pantalla de Bitácoras...");
-    setState(() => _indiceActual = 0); // Restaurar índice si no hay pantalla aún
+  }
+
+  void _irAReportes() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const PantallaReporte()),
+    ).then((_) {
+      setState(() => _indiceActual = 0);
+    });
+    print("Navegando a la pantalla de  Reportes Técnicos...");
   }
 
   @override
@@ -89,12 +97,18 @@ class _MyHomePageState extends State<MyHomePage> {
           IconButton(
             icon: const Icon(Icons.person_add_alt_1_rounded),
             tooltip: 'Registrar Usuario',
-            onPressed: _irARegistroUsuario,
+            //onPressed: _irARegistroUsuario,
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const FormularioRegistro("Usuario", tipo: TipoRegistro.usuario)),
+              );
+              print("Navegando a la pantalla de registro de usuarios...");
+            },
           ),
         ],
       ),
       
-      // CAMBIO CLAVE: Envolver el GridView dentro de un StreamBuilder reactivo
       body: StreamBuilder<List<Petroglifo>>(
         stream: _controlador.listarPetroglifos(), // Escucha Firestore en tiempo real
         builder: (context, snapshot) {
@@ -140,18 +154,15 @@ class _MyHomePageState extends State<MyHomePage> {
                   imageUrl = ''; 
                 }
 
-                // Usamos Card y envolvemos su contenido en un InkWell para detectar el click
                 return Card(
                   elevation: 4,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(12), // Mismo radio de la tarjeta para el efecto visual
+                    borderRadius: BorderRadius.circular(12),
                     onTap: () {
                       print("Navegando al detalle del petroglifo con ID: ${petroglifo.id}");
-                      
-                      // Transición hacia la pantalla de detalle pasándole el objeto completo
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -203,13 +214,6 @@ class _MyHomePageState extends State<MyHomePage> {
           );
         },
       ),
-
-      // Botón flotante para añadir petroglifos directamente desde el Home
-      floatingActionButton: FloatingActionButton(
-        onPressed: _irARegistroPetroglifo,
-        tooltip: 'Registrar Petroglifo',
-        child: const Icon(Icons.add),
-      ),
       
       bottomNavigationBar: NavigationBar(
         selectedIndex: _indiceActual,
@@ -220,13 +224,16 @@ class _MyHomePageState extends State<MyHomePage> {
 
           switch (index) {
             case 0:
-              _irAPetroglifos();
+              _irARegistroPetroglifo(); // Ahora el índice 0 abre directamente el formulario de registro solicitado
               break;
             case 1:
               _irASitios();
               break;
             case 2:
               _irABitacoras();
+              break;
+            case 3:
+              _irAReportes(); // Nueva sección de reportes técnicos
               break;
           }
         },
@@ -242,6 +249,10 @@ class _MyHomePageState extends State<MyHomePage> {
           NavigationDestination(
             icon: Icon(Icons.book_rounded),
             label: 'Bitácoras',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.assignment_rounded), // Ícono representativo para reportes
+            label: 'Reportes',
           ),
         ],
       ),

@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 class FirestoreService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
@@ -12,6 +13,7 @@ class FirestoreService {
       'petroglifosIds': petroglifosIds,
     });
   }
+
   CollectionReference<Map<String, dynamic>> obtenerColeccion(String nombreColeccion) {
     return _firestore.collection(nombreColeccion);
   }
@@ -21,17 +23,16 @@ class FirestoreService {
     await _firestore.collection('petroglifos').doc(id).set(data);
   }
 
+  Future<void> guardarBitacora(String id, Map<String, dynamic> data) async {
+    // Registra el documento en la colección 'bitacoras' usando el ID provisto
+    await _firestore.collection('bitacoras').doc(id).set(data);
+  }
+  Future<void> guardarReporte(String id, Map<String, dynamic> data) async {
+    // Registra el documento en la colección 'reportes' usando el ID provisto
+    await _firestore.collection('reportes').doc(id).set(data);
+  }
   // Streams de datos para el controlador
   Stream<QuerySnapshot<Map<String, dynamic>>> obtenerStreamColeccion(String coleccion) {
     return _firestore.collection(coleccion).snapshots();
   }
-
-  // =========================================================================
-  // EJEMPLO DE ESCALABILIDAD: ¿Cómo añadir una nueva entidad/clase en el futuro?
-  // Si mañana agregas el modelo 'Bitacora', solo vienes aquí y agregas su método:
-  //
-  // Future<void> guardarBitacora(String id, Map<String, dynamic> data) async {
-  //   await _firestore.collection('bitacoras').doc(id).set(data);
-  // }
-  // =========================================================================
 }

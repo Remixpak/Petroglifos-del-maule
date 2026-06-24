@@ -8,6 +8,8 @@ import 'package:software_petroglifos/models/imagen.dart';
 import 'package:software_petroglifos/models/petroglifo.dart';
 import 'package:software_petroglifos/models/sitio.dart';
 import 'package:software_petroglifos/services/firestoreService.dart';
+import 'package:software_petroglifos/models/bitacora.dart';
+import 'package:software_petroglifos/models/reporteTecnico.dart';
 
 class ControladorGestionArqueologica {
   final FirestoreService _dbServicio = FirestoreService();
@@ -312,6 +314,166 @@ class ControladorGestionArqueologica {
           latitud: (data['latitud'] as num?)?.toDouble() ?? 0.0,
           longitud: (data['longitud'] as num?)?.toDouble() ?? 0.0,
           petroglifosIds: List<String>.from(data['petroglifosIds'] ?? []), 
+        );
+      }).toList();
+    });
+  }
+
+  //==========================================
+  //SECCION 3: GESTION DE BITACORAS
+  //==========================================
+  Future<bool> registrarBitacora({
+    required String id,
+    required DateTime fechaInicio,
+    required DateTime fechaFin,
+    required List<String> idParticipantes,
+    required String actividad,
+    required String observaciones,
+  }) async {
+    try {
+      Bitacora nuevaBitacora = Bitacora(
+        id: id.trim(),
+        fechaInicio: fechaInicio,
+        fechaFin: fechaFin,
+        idParticipantes: idParticipantes.map((p) => p.trim()).toList(),
+        actividad: actividad.trim(),
+        observaciones: observaciones.trim(),
+      );
+
+      await _dbServicio.guardarBitacora(nuevaBitacora.id, nuevaBitacora.toFirestore());
+      return true;
+    } catch (e) {
+      print('Error al registrar bitácora: $e');
+      return false;
+    }
+  }
+
+  Stream<List<Bitacora>> listarBitacoras() {
+    return _dbServicio.obtenerStreamColeccion('bitacoras').map((snapshot) {
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+
+        return Bitacora(
+          id: data['id'] ?? '',
+          fechaInicio: DateTime.tryParse(data['fechaInicio'] ?? '') ?? DateTime.now(),
+          fechaFin: DateTime.tryParse(data['fechaFin'] ?? '') ?? DateTime.now(),
+          idParticipantes: List<String>.from(data['idParticipantes'] ?? []),
+          actividad: data['actividad'] ?? '',
+          observaciones: data['observaciones'] ?? '',
+        );
+      }).toList();
+    });
+  }
+
+  // =========================================================================
+  // FILTRO: Obtener Bitácoras por Fecha de Inicio (Menor o Igual) de forma directa
+  // =========================================================================
+  Future<List<Bitacora>> obtenerBitacorasPorFecha(DateTime fechaLimite) async {
+    try {
+      // Convertimos la fecha al formato ISO8601 con el que se almacena en la BD
+      String fechaLimiteIso = fechaLimite.toIso8601String();
+
+      // Realizamos la consulta filtrando directamente en Firestore usando 'where'
+      final snapshot = await _dbServicio
+          .obtenerColeccion('bitacoras')
+          .where('fechaInicio', isLessThanOrEqualTo: fechaLimiteIso)
+          .get();
+
+      // Mapeamos los documentos obtenidos al modelo de dominio Bitacora
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        return Bitacora(
+          id: data['id'] ?? '',
+          fechaInicio: DateTime.tryParse(data['fechaInicio'] ?? '') ?? DateTime.now(),
+          fechaFin: DateTime.tryParse(data['fechaFin'] ?? '') ?? DateTime.now(),
+          idParticipantes: List<String>.from(data['idParticipantes'] ?? []),
+          actividad: data['actividad'] ?? '',
+          observaciones: data['observaciones'] ?? '',
+        );
+      }).toList();
+    } catch (e) {
+      print('Error al filtrar bitácoras por fecha en Firestore: $e');
+      return [];
+    }
+  }
+
+  Future<Bitacora?> buscarBitacora(String idBitacora) async {
+  try {
+    // Buscamos el documento en la colección 'bitacoras'
+    final doc = await _dbServicio
+        .obtenerColeccion('bitacoras')
+        .doc(idBitacora)
+        .get();
+
+    if (!doc.exists || doc.data() == null) {
+      return null;
+    }
+
+    final data = doc.data()!;
+
+    // Reconvertimos las fechas ISO 8601 Strings a objetos DateTime de Dart
+    final DateTime fechaInicioEnum = data['fechaInicio'] != null 
+        ? DateTime.parse(data['fechaInicio']) 
+        : DateTime.now();
+        
+    final DateTime fechaFinEnum = data['fechaFin'] != null 
+        ? DateTime.parse(data['fechaFin']) 
+        : DateTime.now();
+
+    // Convertimos la lista de Firestore a una List<String> de manera segura
+    final List<String> participantesList = data['idParticipantes'] != null
+        ? List<String>.from(data['idParticipantes'])
+        : [];
+
+    return Bitacora(
+      id: data['id'] ?? doc.id,
+      fechaInicio: fechaInicioEnum,
+      fechaFin: fechaFinEnum,
+      idParticipantes: participantesList,
+      actividad: data['actividad'] ?? 'Sin actividad especificada',
+      observaciones: data['observaciones'] ?? '',
+    );
+  } catch (e) {
+    print('Error al buscar la bitácora con ID $idBitacora: $e');
+    return null;
+  }
+}
+  //========================================
+  //SECCION 4: REPOETES
+  //========================================
+  Future<bool> registrarReporte({
+  required String id,
+  required DateTime fechaGeneracion,
+  required DateTime rangoFecha,
+  required List<String> idBitacoras,
+}) async {
+  try {
+    // Creamos la instancia correcta usando tu modelo estructurado
+    ReporteTecnico nuevoReporte = ReporteTecnico(
+      id: id.trim(),
+      fechaGeneracion: fechaGeneracion,
+      rangoFecha: rangoFecha,
+      idBitacoras: idBitacoras.map((id) => id.trim()).toList(),
+    );
+
+    // IMPORTANTE: Asegúrate de que guardarReporte use internamente la colección 'reportes'
+    await _dbServicio.guardarReporte(nuevoReporte.id, nuevoReporte.toFirestore());
+    return true;
+  } catch (e) {
+    print('Error al registrar reporte en el controlador: $e');
+    return false;
+  }
+}
+  Stream<List<ReporteTecnico>> listarReportes() {
+    return _dbServicio.obtenerStreamColeccion('reportes').map((snapshot) {
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+
+        return ReporteTecnico(
+          id: data['id'] ?? '',
+          fechaGeneracion: DateTime.tryParse(data['fechaGeneracion'] ?? '') ?? DateTime.now(),
+          rangoFecha: DateTime.tryParse(data['rangoFecha'] ?? '') ?? DateTime.now(),
+          idBitacoras: List<String>.from(data['idBitacoras'] ?? []),
         );
       }).toList();
     });

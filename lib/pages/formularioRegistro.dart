@@ -5,11 +5,14 @@ import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:file_selector_platform_interface/file_selector_platform_interface.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 // Importaciones de tus modelos y controladores del proyecto
 import 'package:software_petroglifos/controllers/controladorGestionArqueologica.dart';
+import 'package:software_petroglifos/controllers/controladorUsuario.dart';
 import 'package:software_petroglifos/models/fichaTecnica.dart';
 import 'package:software_petroglifos/models/sitio.dart';
+import 'package:software_petroglifos/models/usuario.dart';
 
 // =========================================================================
 // ENUM: TIPOS DE REGISTRO CENTRALIZADOS
@@ -18,8 +21,8 @@ enum TipoRegistro {
   petroglifo,
   sitio,
   usuario,
-  // PASO 1 PARA EXTENDER (Ej: Bitácora): Añade el nuevo identificador aquí
-  // bitacora,
+  bitacora,
+  reporte,
 }
 
 class FormularioRegistro extends StatefulWidget {
@@ -36,6 +39,8 @@ class _FormularioRegistroState extends State<FormularioRegistro> {
   // PROPIEDADES GLOBALES Y CONTROLADORES GENERALES
   // =========================================================================
   final _controladorNegocio = ControladorGestionArqueologica();
+  final _controladorUsuario = ControladorUsuario();
+  final _firestore = FirebaseFirestore.instance;
   bool _guardando = false;
 
   // =========================================================================
@@ -48,7 +53,6 @@ class _FormularioRegistroState extends State<FormularioRegistro> {
   List<PlatformFile> _archivosMultimedia = [];
   final ImagePicker _imagePicker = ImagePicker();
   late Stream<List<Sitio>> _sitiosStream;
-  // CONTROLADORES Y ESTADOS DE LOS ENUMS PARA LA FICHA TÉCNICA
   final _descripcionFichaController = TextEditingController();
   MotivoPetroglifo _motivoSeleccionado = MotivoPetroglifo.indeterminado;
   TecnicaGrabado _tecnicaSeleccionada = TecnicaGrabado.percusion;
@@ -73,14 +77,22 @@ class _FormularioRegistroState extends State<FormularioRegistro> {
   final _emailUserController = TextEditingController();
 
   // =========================================================================
-  // 📝 PASO 2 PARA EXTENDER (Ej: Bitácora): Agrega aquí tus controladores de texto o variables de estado futuros
-  // final _detalleBitacoraController = TextEditingController();
+  //estados específicos de Bitácora
   // =========================================================================
+  final _actividadBitacoraController = TextEditingController();
+  final _observacionesBitacoraController = TextEditingController();
+  DateTime _fechaInicioBitacora = DateTime.now();
+  DateTime _fechaFinBitacora = DateTime.now();
+  List<String?> _participantesBitacora = [null];
+  //================================================================
+  //estados específicos de Reporte
+  //================================================================
+  DateTime _rangoFechaReporte = DateTime.now();
+  bool _buscandoBitacoras = false;
 
   @override
   void initState() {
     super.initState();
-    // Inicializamos el stream de sitios únicamente si vamos a registrar un petroglifo
     if (widget.tipo == TipoRegistro.petroglifo) {
       _sitiosStream = _controladorNegocio.listarSitios();
     }
@@ -90,18 +102,21 @@ class _FormularioRegistroState extends State<FormularioRegistro> {
   void dispose() {
     // Limpieza absoluta de todos los controladores de texto del sistema
     _nombrePetroglifoController.dispose();
+    _descripcionFichaController.dispose();
     _nombreSitioController.dispose();
     _codigoSitioController.dispose();
     _comunaSitioController.dispose();
     _descripcionSitioController.dispose();
     _nombreUserController.dispose();
     _emailUserController.dispose();
+    _actividadBitacoraController.dispose();
+    _observacionesBitacoraController.dispose();
     super.dispose();
   }
 
-  // =========================================================================
-  // LÓGICA DE NEGOCIO Y FUNCIONES: SECCIÓN PETROGLIFOS
-  // =========================================================================
+  //=========================================================================
+  //funciones de petroglifos
+  //=========================================================================
   Future<void> _tomarFoto() async {
     final XFile? foto = await _imagePicker.pickImage(
       source: ImageSource.camera, 
@@ -190,7 +205,6 @@ class _FormularioRegistroState extends State<FormularioRegistro> {
       indicePrincipal: _indiceImagenPrincipal,
       archivosExtra: _archivosMultimedia,
       sitioSeleccionado: _sitioSeleccionado!,
-      // PASAMOS LOS DATOS DE LA FICHA TÉCNICA
       descripcionFicha: _descripcionFichaController.text,
       motivoFicha: _motivoSeleccionado,
       tecnicaFicha: _tecnicaSeleccionada,
@@ -206,9 +220,9 @@ class _FormularioRegistroState extends State<FormularioRegistro> {
     }
   }
 
-  // =========================================================================
-  // LÓGICA DE NEGOCIO Y FUNCIONES: SECCIÓN SITIOS ARQUEOLÓGICOS
-  // =========================================================================
+  //=========================================================================
+  //funciones de sitios
+  //=========================================================================
   Future<void> _obtenerCoordenadasGps() async {
     setState(() => _obteniendoGps = true);
     try {
@@ -260,9 +274,9 @@ class _FormularioRegistroState extends State<FormularioRegistro> {
     }
   }
 
-  // =========================================================================
-  // LÓGICA DE NEGOCIO Y FUNCIONES: SECCIÓN USUARIOS
-  // =========================================================================
+  //=========================================================================
+  //funciones de usuario
+  //=========================================================================
   void _procesarGuardadoUsuario() {
     if (_nombreUserController.text.isEmpty || _emailUserController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Complete los campos obligatorios.')));
@@ -272,13 +286,168 @@ class _FormularioRegistroState extends State<FormularioRegistro> {
     Navigator.pop(context);
   }
 
-  // =========================================================================
-  // PANTALLAS DE DISEÑO INDEPENDIENTES (CONSTRUIDAS POR MÉTODO)
-  // =========================================================================
+  //=========================================================================
+  //funciones de bitacoras
+  //=========================================================================
+  Future<void> _seleccionarFechaHoraBitacora(BuildContext context, bool esInicio) async {
+    final DateTime? fechaPicked = await showDatePicker(
+      context: context,
+      initialDate: esInicio ? _fechaInicioBitacora : _fechaFinBitacora,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+    );
+    if (fechaPicked != null) {
+      final TimeOfDay? horaPicked = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay.fromDateTime(esInicio ? _fechaInicioBitacora : _fechaFinBitacora),
+      );
+      if (horaPicked != null) {
+        setState(() {
+          final DateTime fechaCompleta = DateTime(
+            fechaPicked.year,
+            fechaPicked.month,
+            fechaPicked.day,
+            horaPicked.hour,
+            horaPicked.minute,
+          );
+          if (esInicio) {
+            _fechaInicioBitacora = fechaCompleta;
+          } else {
+            _fechaFinBitacora = fechaCompleta;
+          }
+        });
+      }
+    }
+  }
 
-  // -------------------------------------------------------------------------
-  // DISEÑO: VISTA FORMULARIO PETROGLIFO
-  // -------------------------------------------------------------------------
+  void _procesarGuardadoBitacora() async {
+  if (_actividadBitacoraController.text.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Por favor, introduce la actividad.')));
+    return;
+  }
+
+  List<String> participantesValidos = _participantesBitacora
+      .where((id) => id != null)
+      .cast<String>()
+      .toList();
+
+  if (participantesValidos.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Debe seleccionar al menos el participante obligatorio.')));
+    return;
+  }
+
+  if (_fechaFinBitacora.isBefore(_fechaInicioBitacora)) {
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('La fecha de fin no puede ser anterior a la de inicio.')));
+    return;
+  }
+
+  setState(() => _guardando = true);
+
+  try {
+    // 1. Generamos un ID único localmente si tu arquitectura lo requiere, 
+    // o bien puedes usar un ID aleatorio compatible con tu base de datos.
+    String nuevoIdBitacora = 'bit_${DateTime.now().millisecondsSinceEpoch}';
+
+    // 2. LLAMADA CENTRALIZADA: Guardamos invocando al controlador de negocio
+    bool guardadoExitoso = await _controladorNegocio.registrarBitacora(
+      id: nuevoIdBitacora,
+      fechaInicio: _fechaInicioBitacora,
+      fechaFin: _fechaFinBitacora,
+      idParticipantes: participantesValidos,
+      actividad: _actividadBitacoraController.text,
+      observaciones: _observacionesBitacoraController.text,
+    );
+
+    if (guardadoExitoso) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('¡Bitácora registrada con éxito!')));
+      Navigator.pop(context);
+    } else {
+      throw Exception('El controlador no pudo persistir la bitácora.');
+    }
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al guardar bitácora: $e')));
+  } finally {
+    setState(() => _guardando = false);
+  }
+}
+
+  //=========================================================================
+  //funciones de reporte
+  //=========================================================================
+  Future<void> _seleccionarFechaReporte(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _rangoFechaReporte,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+    );
+    if (picked != null && picked != _rangoFechaReporte) {
+      setState(() {
+        _rangoFechaReporte = picked;
+      });
+    }
+  }
+
+  void _procesarGuardadoReporteTecnico() async {
+  setState(() {
+    _guardando = true;
+    _buscandoBitacoras = true;
+  });
+
+  try {
+    // 1. Buscamos las bitácoras por fecha límite usando el controlador de negocio
+    final bitacorasFiltradas = await _controladorNegocio.obtenerBitacorasPorFecha(_rangoFechaReporte);
+    
+    // Extraemos únicamente los IDs en una lista de Strings
+    List<String> idsBitacorasEncontradas = bitacorasFiltradas.map((b) => b.id).toList();
+
+    if (idsBitacorasEncontradas.isEmpty) {
+      setState(() {
+        _guardando = false;
+        _buscandoBitacoras = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se encontraron bitácoras iniciadas en o antes de la fecha seleccionada. RECHAZADO.')),
+      );
+      return;
+    }
+
+    setState(() => _buscandoBitacoras = false);
+    String nuevoIdReporte = 'rep_${DateTime.now().millisecondsSinceEpoch}';
+
+
+    bool guardadoExitoso = await _controladorNegocio.registrarReporte(
+      id: nuevoIdReporte,
+      fechaGeneracion: DateTime.now(),
+      rangoFecha: _rangoFechaReporte,
+      idBitacoras: idsBitacorasEncontradas,
+    );
+
+    if (guardadoExitoso) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('¡Reporte generado con éxito! Vinculadas ${idsBitacorasEncontradas.length} bitácoras.')),
+      );
+      Navigator.pop(context);
+    } else {
+      throw Exception('El controlador no pudo guardar el documento.');
+    }
+
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Error al generar Reporte Técnico: $e')),
+    );
+  } finally {
+    setState(() {
+      _guardando = false;
+      _buscandoBitacoras = false;
+    });
+  }
+}
+
+  //=========================================================================
+  //formularios 
+  //=========================================================================
+
   Widget _construirFormularioPetroglifo() {
     bool esWindows = defaultTargetPlatform == TargetPlatform.windows;
     return Column(
@@ -304,9 +473,6 @@ class _FormularioRegistroState extends State<FormularioRegistro> {
           controller: _nombrePetroglifoController,
           decoration: const InputDecoration(labelText: 'Nombre del Petroglifo *', border: OutlineInputBorder()),
         ),
-        // =====================================================================
-        // COMPONENTE INTEGRADO: FORMULARIO SECCIÓN FICHA TÉCNICA
-        // =====================================================================
         const SizedBox(height: 28),
         const Row(
           children: [
@@ -317,15 +483,12 @@ class _FormularioRegistroState extends State<FormularioRegistro> {
         ),
         const Divider(color: Colors.brown, thickness: 1.2),
         const SizedBox(height: 10),
-        
         TextField(
           controller: _descripcionFichaController,
           maxLines: 3,
           decoration: const InputDecoration(labelText: 'Descripción de Símbolos / Observaciones *', border: OutlineInputBorder()),
         ),
         const SizedBox(height: 16),
-        
-        // Dropdown para Motivos
         DropdownButtonFormField<MotivoPetroglifo>(
           value: _motivoSeleccionado,
           decoration: const InputDecoration(labelText: 'Motivo del Grabado', border: OutlineInputBorder()),
@@ -335,8 +498,6 @@ class _FormularioRegistroState extends State<FormularioRegistro> {
           onChanged: (val) => setState(() => _motivoSeleccionado = val!),
         ),
         const SizedBox(height: 16),
-        
-        // Dropdown para Técnica de Grabado
         DropdownButtonFormField<TecnicaGrabado>(
           value: _tecnicaSeleccionada,
           decoration: const InputDecoration(labelText: 'Técnica de Manufactura', border: OutlineInputBorder()),
@@ -346,8 +507,6 @@ class _FormularioRegistroState extends State<FormularioRegistro> {
           onChanged: (val) => setState(() => _tecnicaSeleccionada = val!),
         ),
         const SizedBox(height: 16),
-        
-        // Dropdown para Tipo de Soporte Lítico
         DropdownButtonFormField<TipoRoca>(
           value: _rocaSeleccionada,
           decoration: const InputDecoration(labelText: 'Tipo de Roca / Soporte', border: OutlineInputBorder()),
@@ -357,7 +516,7 @@ class _FormularioRegistroState extends State<FormularioRegistro> {
           onChanged: (val) => setState(() => _rocaSeleccionada = val!),
         ),
         const SizedBox(height: 20),
-        Text('Fotografías (* Presione miniatura para definir principal)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[700])),
+        Text('Fotografías (* Presione miniatura para definir principal)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.brown)),
         const SizedBox(height: 8),
         Container(
           height: 120,
@@ -433,9 +592,6 @@ class _FormularioRegistroState extends State<FormularioRegistro> {
     );
   }
 
-  // -------------------------------------------------------------------------
-  // DISEÑO: VISTA FORMULARIO SITIO ARQUEOLÓGICO
-  // -------------------------------------------------------------------------
   Widget _construirFormularioSitio() {
     final double width = MediaQuery.of(context).size.width;
     final double paddingHorizontal = width > 600 ? width * 0.15 : 0.0;
@@ -508,9 +664,6 @@ class _FormularioRegistroState extends State<FormularioRegistro> {
     );
   }
 
-  // -------------------------------------------------------------------------
-  // DISEÑO: VISTA FORMULARIO USUARIO
-  // -------------------------------------------------------------------------
   Widget _construirFormularioUsuario() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -537,41 +690,197 @@ class _FormularioRegistroState extends State<FormularioRegistro> {
     );
   }
 
-  // -------------------------------------------------------------------------
-  //  PASO 4 PARA EXTENDER (Ej: Bitácora): Agrega aquí el diseño de la vista futura
-  // -------------------------------------------------------------------------
-  /*
   Widget _construirFormularioBitacora() {
+    return StreamBuilder<List<Usuario>>(
+      stream: _controladorUsuario.listarUsuarios(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const Center(child: Text('No hay usuarios registrados en el sistema para asignar.'));
+        }
+
+        List<Usuario> listaUsuarios = snapshot.data!;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ListTile(
+              title: const Text('Fecha/Hora Inicio'),
+              subtitle: Text(_fechaInicioBitacora.toString().substring(0, 16)),
+              trailing: const Icon(Icons.calendar_today_rounded),
+              onTap: () => _seleccionarFechaHoraBitacora(context, true),
+            ),
+            ListTile(
+              title: const Text('Fecha/Hora Fin'),
+              subtitle: Text(_fechaFinBitacora.toString().substring(0, 16)),
+              trailing: const Icon(Icons.calendar_today_rounded),
+              onTap: () => _seleccionarFechaHoraBitacora(context, false),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Participantes del Proyecto',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87),
+            ),
+            const SizedBox(height: 8),
+
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _participantesBitacora.length,
+              itemBuilder: (context, index) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8.0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: _participantesBitacora[index],
+                          decoration: InputDecoration(
+                            labelText: index == 0 ? 'Participante Obligatorio *' : 'Participante Adicional',
+                            border: const OutlineInputBorder(),
+                          ),
+                          items: listaUsuarios.map((user) {
+                            return DropdownMenuItem<String>(
+                              value: user.id,
+                              child: Text(user.nombre),
+                            );
+                          }).toList(),
+                          onChanged: (String? nuevoId) {
+                            setState(() => _participantesBitacora[index] = nuevoId);
+                          },
+                        ),
+                      ),
+                      if (index > 0)
+                        IconButton(
+                          icon: const Icon(Icons.remove_circle, color: Colors.red),
+                          onPressed: () {
+                            setState(() => _participantesBitacora.removeAt(index));
+                          },
+                        )
+                    ],
+                  ),
+                );
+              },
+            ),
+
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                icon: const Icon(Icons.add),
+                label: const Text('Agregar Participante'),
+                onPressed: () {
+                  setState(() => _participantesBitacora.add(null));
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _actividadBitacoraController,
+              decoration: const InputDecoration(labelText: 'Actividad Realizada *', border: OutlineInputBorder()),
+              maxLines: 3,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _observacionesBitacoraController,
+              decoration: const InputDecoration(labelText: 'Observaciones', border: OutlineInputBorder()),
+              maxLines: 3,
+            ),
+            const SizedBox(height: 30),
+            _guardando
+                ? const Center(child: CircularProgressIndicator())
+                : ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.all(16), 
+                      backgroundColor: Colors.teal, 
+                      foregroundColor: Colors.white
+                    ),
+                    onPressed: _procesarGuardadoBitacora,
+                    child: const Text('Guardar Bitácora', style: TextStyle(fontSize: 16)),
+                  ),
+          ],
+        );
+      },
+    );
+  }
+
+ Widget _construirFormularioReporteTecnico() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        TextField(controller: _detalleBitacoraController, decoration: InputDecoration(labelText: 'Nota de bitácora')),
-        ElevatedButton(onPressed: () {}, child: Text('Guardar Bitácora'))
+        const Text(
+          'Generación Automatizada de Reporte Técnico',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.indigo),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'El sistema recopilará automáticamente todas las bitácoras cuya fecha de inicio sea anterior o igual al límite seleccionado.',
+          style: TextStyle(color: Colors.grey),
+        ),
+        const SizedBox(height: 20),
+        Card(
+          elevation: 2,
+          child: ListTile(
+            leading: const Icon(Icons.date_range_rounded, color: Colors.indigo),
+            title: const Text('Fecha Límite de Búsqueda (≤)'),
+            subtitle: Text(
+              "${_rangoFechaReporte.day}/${_rangoFechaReporte.month}/${_rangoFechaReporte.year}",
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            trailing: const Icon(Icons.edit),
+            onTap: () => _seleccionarFechaReporte(context),
+          ),
+        ),
+        const SizedBox(height: 40),
+        _guardando
+            ? Column(
+                children: [
+                  const CircularProgressIndicator(color: Colors.indigo),
+                  const SizedBox(height: 12),
+                  Text(
+                    _buscandoBitacoras ? 'Consultando bitácoras en Firestore...' : 'Escribiendo reporte...',
+                    style: const TextStyle(fontStyle: FontStyle.italic),
+                  )
+                ],
+              )
+            : ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.all(16),
+                  backgroundColor: Colors.indigo,
+                  foregroundColor: Colors.white,
+                ),
+                icon: const Icon(Icons.assignment_turned_in_rounded),
+                onPressed: _procesarGuardadoReporteTecnico,
+                label: const Text('Compilar y Registrar Reporte', style: TextStyle(fontSize: 16)),
+              ),
       ],
     );
   }
-  */
 
-  // =========================================================================
-  // SELECTOR CENTRALIZADO DEL TÍTULO DE LA VISTA
-  // =========================================================================
+  //=========================================================================
+  //selectro de titulo
+  //=========================================================================
   String _obtenerTituloAppBar() {
     switch (widget.tipo) {
       case TipoRegistro.petroglifo: return 'Registrar Petroglifo';
       case TipoRegistro.sitio: return 'Registrar Sitio Arqueológico';
       case TipoRegistro.usuario: return 'Registrar Nuevo Usuario';
-      // case TipoRegistro.bitacora: return 'Nueva Entrada de Bitácora';
+      case TipoRegistro.bitacora: return 'Nueva Entrada de Bitácora';
+      case TipoRegistro.reporte: return 'Generar Reporte';
     }
   }
 
-  // =========================================================================
-  // SELECTOR CENTRALIZADO DE LA INTERFAZ ACTIVA
-  // =========================================================================
+  //=========================================================================
+  //selector de interfaz
+  //=========================================================================
   Widget _seleccionarCuerpoFormulario() {
     switch (widget.tipo) {
       case TipoRegistro.petroglifo: return _construirFormularioPetroglifo();
       case TipoRegistro.sitio: return _construirFormularioSitio();
       case TipoRegistro.usuario: return _construirFormularioUsuario();
-      // case TipoRegistro.bitacora: return _construirFormularioBitacora();
+      case TipoRegistro.bitacora: return _construirFormularioBitacora();
+      case TipoRegistro.reporte: return _construirFormularioReporteTecnico();
     }
   }
 
@@ -586,16 +895,3 @@ class _FormularioRegistroState extends State<FormularioRegistro> {
     );
   }
 }
-
-// =========================================================================
-// GUÍA DE EXTENSIÓN GLOBAL (EJ: AGREGAR BITÁCORA)
-// =========================================================================
-/*
-  Si necesitas agregar un formulario para una nueva entidad como una "Bitácora", realiza estos pasos:
-
-  1. Ve al enum 'TipoRegistro' arriba y añade la opción: 'bitacora,'.
-  2. En el estado de la clase ('_FormularioRegistroState'), declara los controladores específicos si se necesitan (ej: _detalleBitacoraController).
-  3. Crea la función que procese los datos y llame al controlador (ej: _procesarGuardadoBitacora()).
-  4. Crea la estructura visual abajo mediante una nueva función de tipo Widget (ej: _construirFormularioBitacora()).
-  5. Vincula el caso en los métodos selectores '_obtenerTituloAppBar()' y '_seleccionarCuerpoFormulario()'.
-*/
