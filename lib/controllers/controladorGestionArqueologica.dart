@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
+import 'package:software_petroglifos/models/fichaTecnica.dart';
 import 'package:uuid/uuid.dart';
 import 'package:software_petroglifos/models/archivoMultimedia.dart';
 import 'package:software_petroglifos/models/imagen.dart'; 
@@ -127,16 +128,20 @@ class ControladorGestionArqueologica {
     required int indicePrincipal,
     required List<PlatformFile> archivosExtra,
     required Sitio sitioSeleccionado,
+    // RECIBIMOS LOS CAMPOS DE LA FICHA TÉCNICA REQUERIDOS DESDE LA INTERFAZ
+    required String descripcionFicha,
+    required MotivoPetroglifo motivoFicha,
+    required TecnicaGrabado tecnicaFicha,
+    required TipoRoca rocaFicha,
   }) async {
     try {
-      // CLAVE: Solicitamos de forma asíncrona el siguiente código secuencial disponible
+      // 1. Solicitamos de forma asíncrona el siguiente código secuencial disponible (Ej: "MAU-05")
       String nuevoPetroglifoId = await generarSiguienteCodigoPetroglifo();
 
-      // 1. Estructuramos las entidades de imágenes con IDs únicos estables y rutas sanitizadas
+      // 2. Estructuramos las entidades de imágenes con IDs únicos
       List<imagen> listaImagenes = [];
       for (int i = 0; i < fotosCandidatas.length; i++) {
         final fileCandidate = fotosCandidatas[i];
-        
         String rutaSegura = (fileCandidate.path != null && fileCandidate.path!.isNotEmpty) 
             ? fileCandidate.path! 
             : 'memoria_cache_temporal';
@@ -151,7 +156,7 @@ class ControladorGestionArqueologica {
         ));
       }
 
-      // 2. Estructuramos los archivos multimedia adicionales sanitizados
+      // 3. Estructuramos los archivos multimedia adicionales
       List<archivoMultimedia> listaMultimedia = archivosExtra.map((file) {
         String rutaSeguraMultimedia = (file.path != null && file.path!.isNotEmpty) 
             ? file.path! 
@@ -165,34 +170,92 @@ class ControladorGestionArqueologica {
         );
       }).toList();
 
-      // 3. Instanciamos el objeto de dominio Petroglifo usando el nuevo ID secuencial
+      // 4. Instanciamos el objeto de dominio Petroglifo usando el nuevo ID secuencial
       Petroglifo nuevoPetroglifo = Petroglifo(
-        id: nuevoPetroglifoId, // <--- Ahora es 'MAU-XX'
+        id: nuevoPetroglifoId, 
         nombre: nombre.trim(),
         imagenes: listaImagenes,
         archivosMultimedia: listaMultimedia,
       );
 
-      // 4. EJECUCIÓN DEL ALGORITMO: Transformación de Ronald
+      // 5. EJECUCIÓN DEL ALGORITMO: Transformación de Ronald
       nuevoPetroglifo.imagenesBase64 = await transformacionDeRonald(
         fotosVisualizables: fotosCandidatas, 
         imagenes: nuevoPetroglifo.imagenes
       );
 
-      // 5. Envío puro y seguro al servicio de base de datos usando el ID 'MAU-XX' como la llave del documento
+      // 6. Transacción Pura 1: Envío del Petroglifo a su respectiva colección
       await _dbServicio.guardarPetroglifo(nuevoPetroglifo.id, nuevoPetroglifo.toFirestore());
 
-      // 6. Sincronización en el Sitio Arqueológico correspondiente
+      // 7. Transacción Pura 2: Instanciar y Guardar la Ficha Técnica oficial enlazada
+      FichaTecnica nuevaFicha = FichaTecnica(
+        id: 'ficha_$nuevoPetroglifoId',
+        codigoPetroglifo: nuevoPetroglifoId, // <--- Relación de Clave Foránea
+        descripcion: descripcionFicha.trim(),
+        motivo: motivoFicha,
+        tecnicaGrabado: tecnicaFicha,
+        tpoRoca: rocaFicha,
+      );
+
+      // Guardamos la ficha en una colección dedicada compartiendo la llave del documento
+      await _dbServicio.obtenerColeccion('fichas_tecnicas')
+          .doc(nuevaFicha.id)
+          .set(nuevaFicha.toFirestore());
+
+      // 8. Sincronización en el Sitio Arqueológico correspondiente
       sitioSeleccionado.AgregarPetroglifo(nuevoPetroglifo.id);
       await _dbServicio.actualizarPetroglifosEnSitio(sitioSeleccionado.id, sitioSeleccionado.petroglifosIds);
 
       return true;
     } catch (e) {
-      print('Error al registrar Petroglifo en la Fachada (Algoritmo Ronald): $e');
+      print('Error crítico al registrar Petroglifo con Ficha Técnica: $e');
       return false;
     }
   }
 
+  Future<FichaTecnica?> buscarFicha(String petroglifoId) async {
+    try {
+      // Buscamos el documento cuyo ID estructural es 'ficha_MAU-XX'
+      final doc = await _dbServicio
+          .obtenerColeccion('fichas_tecnicas')
+          .doc('ficha_$petroglifoId')
+          .get();
+
+      if (!doc.exists || doc.data() == null) {
+        return null;
+      }
+
+      final data = doc.data()!;
+
+      // Reconvertimos de manera segura los Strings de Firestore a los Enums de Dart
+      final motivoEnum = MotivoPetroglifo.values.firstWhere(
+        (e) => e.name == data['motivo'],
+        orElse: () => MotivoPetroglifo.indeterminado,
+      );
+
+      final tecnicaEnum = TecnicaGrabado.values.firstWhere(
+        (e) => e.name == data['tecnicaGrabado'],
+        orElse: () => TecnicaGrabado.percusion,
+      );
+
+      final rocaEnum = TipoRoca.values.firstWhere(
+        (e) => e.name == data['tpoRoca'],
+        orElse: () => TipoRoca.basalto,
+      );
+
+      return FichaTecnica(
+        id: data['id'] ?? doc.id,
+        codigoPetroglifo: data['codigoPetroglifo'] ?? '',
+        descripcion: data['descripcion'] ?? '',
+        motivo: motivoEnum,
+        tecnicaGrabado: tecnicaEnum,
+        tpoRoca: rocaEnum,
+      );
+    } catch (e) {
+      print('Error al buscar la ficha técnica del petroglifo $petroglifoId: $e');
+      return null;
+    }
+  }
   // ==========================================
   // SECCIÓN 2: GESTIÓN DE SITIOS ARQUEOLÓGICOS
   // ==========================================

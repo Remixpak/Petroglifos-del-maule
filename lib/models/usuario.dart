@@ -7,7 +7,7 @@ class Usuario
   final String nombre;
   final String correo;
   final String clave;
-  final bool estado;
+  final bool estado;//Eliminar
   final Rol rol;
   final String institucion;
   Usuario({

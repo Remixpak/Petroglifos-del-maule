@@ -8,6 +8,7 @@ import 'package:file_selector_platform_interface/file_selector_platform_interfac
 
 // Importaciones de tus modelos y controladores del proyecto
 import 'package:software_petroglifos/controllers/controladorGestionArqueologica.dart';
+import 'package:software_petroglifos/models/fichaTecnica.dart';
 import 'package:software_petroglifos/models/sitio.dart';
 
 // =========================================================================
@@ -17,7 +18,7 @@ enum TipoRegistro {
   petroglifo,
   sitio,
   usuario,
-  // 📝 PASO 1 PARA EXTENDER (Ej: Bitácora): Añade el nuevo identificador aquí
+  // PASO 1 PARA EXTENDER (Ej: Bitácora): Añade el nuevo identificador aquí
   // bitacora,
 }
 
@@ -47,6 +48,11 @@ class _FormularioRegistroState extends State<FormularioRegistro> {
   List<PlatformFile> _archivosMultimedia = [];
   final ImagePicker _imagePicker = ImagePicker();
   late Stream<List<Sitio>> _sitiosStream;
+  // CONTROLADORES Y ESTADOS DE LOS ENUMS PARA LA FICHA TÉCNICA
+  final _descripcionFichaController = TextEditingController();
+  MotivoPetroglifo _motivoSeleccionado = MotivoPetroglifo.indeterminado;
+  TecnicaGrabado _tecnicaSeleccionada = TecnicaGrabado.percusion;
+  TipoRoca _rocaSeleccionada = TipoRoca.basalto;
 
   // =========================================================================
   // ESTADO ESPECÍFICO: SECCIÓN SITIOS ARQUEOLÓGICOS
@@ -166,23 +172,36 @@ class _FormularioRegistroState extends State<FormularioRegistro> {
   }
 
   void _procesarGuardadoPetroglifo() async {
-    if (_nombrePetroglifoController.text.isEmpty || _sitioSeleccionado == null || _fotosVisualizables.isEmpty) {
+    if (_nombrePetroglifoController.text.isEmpty || 
+        _sitioSeleccionado == null || 
+        _fotosVisualizables.isEmpty || 
+        _descripcionFichaController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Complete los campos obligatorios (*).')),
+        const SnackBar(content: Text('Complete los campos obligatorios (*) del Petroglifo y su Ficha.')),
       );
       return;
     }
+
     setState(() => _guardando = true);
+
     bool exito = await _controladorNegocio.registrarPetroglifo(
       nombre: _nombrePetroglifoController.text,
       fotosCandidatas: _fotosVisualizables,
       indicePrincipal: _indiceImagenPrincipal,
       archivosExtra: _archivosMultimedia,
       sitioSeleccionado: _sitioSeleccionado!,
+      // PASAMOS LOS DATOS DE LA FICHA TÉCNICA
+      descripcionFicha: _descripcionFichaController.text,
+      motivoFicha: _motivoSeleccionado,
+      tecnicaFicha: _tecnicaSeleccionada,
+      rocaFicha: _rocaSeleccionada,
     );
+
     setState(() => _guardando = false);
     if (exito) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('¡Petroglifo registrado con éxito!')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('¡Petroglifo y Ficha Técnica vinculados con éxito!')),
+      );
       Navigator.pop(context);
     }
   }
@@ -284,6 +303,58 @@ class _FormularioRegistroState extends State<FormularioRegistro> {
         TextField(
           controller: _nombrePetroglifoController,
           decoration: const InputDecoration(labelText: 'Nombre del Petroglifo *', border: OutlineInputBorder()),
+        ),
+        // =====================================================================
+        // COMPONENTE INTEGRADO: FORMULARIO SECCIÓN FICHA TÉCNICA
+        // =====================================================================
+        const SizedBox(height: 28),
+        const Row(
+          children: [
+            Icon(Icons.analytics_outlined, color: Colors.brown),
+            SizedBox(width: 8),
+            Text('Ficha Técnica Arqueológica', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.brown)),
+          ],
+        ),
+        const Divider(color: Colors.brown, thickness: 1.2),
+        const SizedBox(height: 10),
+        
+        TextField(
+          controller: _descripcionFichaController,
+          maxLines: 3,
+          decoration: const InputDecoration(labelText: 'Descripción de Símbolos / Observaciones *', border: OutlineInputBorder()),
+        ),
+        const SizedBox(height: 16),
+        
+        // Dropdown para Motivos
+        DropdownButtonFormField<MotivoPetroglifo>(
+          value: _motivoSeleccionado,
+          decoration: const InputDecoration(labelText: 'Motivo del Grabado', border: OutlineInputBorder()),
+          items: MotivoPetroglifo.values.map((motivo) {
+            return DropdownMenuItem(value: motivo, child: Text(motivo.name.toUpperCase()));
+          }).toList(),
+          onChanged: (val) => setState(() => _motivoSeleccionado = val!),
+        ),
+        const SizedBox(height: 16),
+        
+        // Dropdown para Técnica de Grabado
+        DropdownButtonFormField<TecnicaGrabado>(
+          value: _tecnicaSeleccionada,
+          decoration: const InputDecoration(labelText: 'Técnica de Manufactura', border: OutlineInputBorder()),
+          items: TecnicaGrabado.values.map((tecnica) {
+            return DropdownMenuItem(value: tecnica, child: Text(tecnica.name.toUpperCase()));
+          }).toList(),
+          onChanged: (val) => setState(() => _tecnicaSeleccionada = val!),
+        ),
+        const SizedBox(height: 16),
+        
+        // Dropdown para Tipo de Soporte Lítico
+        DropdownButtonFormField<TipoRoca>(
+          value: _rocaSeleccionada,
+          decoration: const InputDecoration(labelText: 'Tipo de Roca / Soporte', border: OutlineInputBorder()),
+          items: TipoRoca.values.map((roca) {
+            return DropdownMenuItem(value: roca, child: Text(roca.name.toUpperCase()));
+          }).toList(),
+          onChanged: (val) => setState(() => _rocaSeleccionada = val!),
         ),
         const SizedBox(height: 20),
         Text('Fotografías (* Presione miniatura para definir principal)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[700])),
@@ -467,7 +538,7 @@ class _FormularioRegistroState extends State<FormularioRegistro> {
   }
 
   // -------------------------------------------------------------------------
-  // 📝 PASO 4 PARA EXTENDER (Ej: Bitácora): Agrega aquí el diseño de la vista futura
+  //  PASO 4 PARA EXTENDER (Ej: Bitácora): Agrega aquí el diseño de la vista futura
   // -------------------------------------------------------------------------
   /*
   Widget _construirFormularioBitacora() {
@@ -517,7 +588,7 @@ class _FormularioRegistroState extends State<FormularioRegistro> {
 }
 
 // =========================================================================
-// 📝 GUÍA DE EXTENSIÓN GLOBAL (EJ: AGREGAR BITÁCORA)
+// GUÍA DE EXTENSIÓN GLOBAL (EJ: AGREGAR BITÁCORA)
 // =========================================================================
 /*
   Si necesitas agregar un formulario para una nueva entidad como una "Bitácora", realiza estos pasos:

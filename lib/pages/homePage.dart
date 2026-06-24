@@ -4,8 +4,10 @@ import 'package:software_petroglifos/controllers/controladorGestionArqueologica.
 import 'package:software_petroglifos/models/petroglifo.dart';
 import 'package:software_petroglifos/pages/PantallaDeRegistro.dart';
 import 'package:software_petroglifos/pages/pantallaSitios.dart';
-import 'package:software_petroglifos/pages/formularioPetroglifos.dart';
+
 import 'package:software_petroglifos/pages/formularioRegistro.dart';
+// Añade la importación de la pantalla de detalle al inicio del archivo
+import 'package:software_petroglifos/pages/detallePetroglifo.dart';
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.title});
@@ -32,7 +34,7 @@ class _MyHomePageState extends State<MyHomePage> {
   void _irARegistroPetroglifo() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const formularioPetroglifo()),
+      MaterialPageRoute(builder: (context) => const FormularioRegistro("Petroglifo", tipo: TipoRegistro.petroglifo)),
     );
     print("Navegando a la pantalla de registro de petroglifos...");
   }
@@ -132,54 +134,68 @@ class _MyHomePageState extends State<MyHomePage> {
                 
                 try {
                   final imgPrincipal = petroglifo.obtenerImagenPrincipal();
-                  imageUrl = imgPrincipal.url; // Contiene la URL o la data Base64
-                  // Si el string empieza con la cabecera típica o no es un link HTTP, es Base64
+                  imageUrl = imgPrincipal.url; 
                   esBase64 = !imageUrl.startsWith('http');
                 } catch (e) {
                   imageUrl = ''; 
                 }
 
+                // Usamos Card y envolvemos su contenido en un InkWell para detectar el click
                 return Card(
                   elevation: 4,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(
-                        child: ClipRRect(
-                          borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                          child: imageUrl.isNotEmpty
-                              ? (esBase64 
-                                  ? Image.memory(
-                                      base64Decode(imageUrl),
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, size: 50),
-                                    )
-                                  : Image.network(
-                                      imageUrl,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, size: 50),
-                                    ))
-                              : const Icon(Icons.image_not_supported, size: 50),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12), // Mismo radio de la tarjeta para el efecto visual
+                    onTap: () {
+                      print("Navegando al detalle del petroglifo con ID: ${petroglifo.id}");
+                      
+                      // Transición hacia la pantalla de detalle pasándole el objeto completo
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => DetallePetroglifo(petroglifo: petroglifo),
                         ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(12.0),
-                        key: ValueKey(petroglifo.id),
-                        child: Text(
-                          petroglifo.nombre,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                      );
+                    },
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                            child: imageUrl.isNotEmpty
+                                ? (esBase64 
+                                    ? Image.memory(
+                                        base64Decode(imageUrl),
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, size: 50),
+                                      )
+                                    : Image.network(
+                                        imageUrl,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, size: 50),
+                                      ))
+                                : const Icon(Icons.image_not_supported, size: 50),
                           ),
-                          textAlign: TextAlign.center,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    ],
+                        Padding(
+                          padding: const EdgeInsets.all(12.0),
+                          key: ValueKey(petroglifo.id),
+                          child: Text(
+                            petroglifo.nombre,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },

@@ -1,6 +1,12 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:software_petroglifos/models/usuario.dart'; // Ajusta la ruta a tu modelo
+import 'package:software_petroglifos/models/usuario.dart';
+
+/*
+CAMBIAR NOMBRE A CONTROLADORUSUARIO
+
+
+ */
 
 class Controladorregistrologin {
   final FirebaseAuth _auth = FirebaseAuth.instance;

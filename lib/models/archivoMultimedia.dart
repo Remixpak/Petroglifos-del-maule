@@ -3,7 +3,8 @@ class archivoMultimedia {
   String id;
   String nombreArchivo;
   String tipoArchivo;
-  String rutaArchivo;
+  String rutaArchivo;//REVISAR ESTO YA QUE NO ME ACUERDO SI ERA NECESARIO
+  //bool visibilidad en bola si se pone
 
   archivoMultimedia({
     required this.id,

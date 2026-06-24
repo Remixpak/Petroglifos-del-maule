@@ -5,7 +5,7 @@ class Petroglifo {
   final String id;
   final String nombre;
   final List<archivoMultimedia> archivosMultimedia;
-  final List<imagen> imagenes;
+  final List<imagen> imagenes;//revisar esta wea porque podria funcionar con la lista de archivos multimedia y hacer downcasting
 
   // Mapa que almacena el resultado procesado por la Transformación de Ronald
   Map<String, String> imagenesBase64 = {};
@@ -42,6 +42,10 @@ class Petroglifo {
       }).toList(),
     };
   }
+  /*
+  IMPLEMENTAR EL ELIMINAR ARCHIVO MULTIMEDIA
+  
+   */
 
   imagen obtenerImagenPrincipal() {
     if (imagenes.isEmpty) throw StateError('No hay imágenes disponibles');
