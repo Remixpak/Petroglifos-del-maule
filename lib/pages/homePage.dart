@@ -23,13 +23,13 @@ class _MyHomePageState extends State<MyHomePage> {
   // Controla cuál botón de la barra inferior está seleccionado (0: Petroglifos por defecto)
   int _indiceActual = 0;
 
-  /*void _irARegistroUsuario() {
+  void _irARegistroUsuario() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const PantallaRegistro()),
+      MaterialPageRoute(builder: (context) => const FormularioRegistro("Usuario", tipo: TipoRegistro.usuario)),
     );
     print("Navegando a la pantalla de registro de usuarios...");
-  }*/
+  }
 
   void _irARegistroPetroglifo() {
     Navigator.push(
@@ -99,11 +99,7 @@ class _MyHomePageState extends State<MyHomePage> {
             tooltip: 'Registrar Usuario',
             //onPressed: _irARegistroUsuario,
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const FormularioRegistro("Usuario", tipo: TipoRegistro.usuario)),
-              );
-              print("Navegando a la pantalla de registro de usuarios...");
+              _irARegistroUsuario();
             },
           ),
         ],

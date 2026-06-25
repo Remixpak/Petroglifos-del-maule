@@ -15,7 +15,7 @@ class PantallaReporte extends StatefulWidget {
 
 class _PantallaReporteState extends State<PantallaReporte> {
   final _controlador = ControladorGestionArqueologica();
-
+  final _controladorUsuario = ControladorUsuario();
   void _irARegistroReporte() {
     Navigator.push(
       context,
@@ -157,9 +157,10 @@ class _PantallaReporteState extends State<PantallaReporte> {
         FutureBuilder<List<String>>(
           // Mapeamos los IDs a promesas que buscan cada nombre en paralelo
           future: Future.wait(
-            bitacora.idParticipantes.map(
-              (id) => ControladorUsuario().buscarUsuario(id),
-            ),
+            bitacora.idParticipantes.map((id) async {
+              final usuario = await _controladorUsuario.buscarUsuario(id);
+              return usuario?.nombre ?? id;
+            }),
           ),
           builder: (context, nombresSnapshot) {
             if (nombresSnapshot.connectionState == ConnectionState.waiting) {

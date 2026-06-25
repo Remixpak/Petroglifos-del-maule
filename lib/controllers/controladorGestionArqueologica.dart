@@ -7,7 +7,7 @@ import 'package:software_petroglifos/models/archivoMultimedia.dart';
 import 'package:software_petroglifos/models/imagen.dart'; 
 import 'package:software_petroglifos/models/petroglifo.dart';
 import 'package:software_petroglifos/models/sitio.dart';
-import 'package:software_petroglifos/services/firestoreService.dart';
+import 'package:software_petroglifos/controllers/firestoreService.dart';
 import 'package:software_petroglifos/models/bitacora.dart';
 import 'package:software_petroglifos/models/reporteTecnico.dart';
 
@@ -218,11 +218,8 @@ class ControladorGestionArqueologica {
   Future<FichaTecnica?> buscarFicha(String petroglifoId) async {
     try {
       // Buscamos el documento cuyo ID estructural es 'ficha_MAU-XX'
-      final doc = await _dbServicio
-          .obtenerColeccion('fichas_tecnicas')
-          .doc('ficha_$petroglifoId')
-          .get();
-
+      
+      final doc = await _dbServicio.obtenerDocumentoPorId('fichas_tecnicas', 'ficha_$petroglifoId');
       if (!doc.exists || doc.data() == null) {
         return null;
       }
@@ -368,42 +365,42 @@ class ControladorGestionArqueologica {
   // =========================================================================
   // FILTRO: Obtener Bitácoras por Fecha de Inicio (Menor o Igual) de forma directa
   // =========================================================================
-  Future<List<Bitacora>> obtenerBitacorasPorFecha(DateTime fechaLimite) async {
-    try {
-      // Convertimos la fecha al formato ISO8601 con el que se almacena en la BD
-      String fechaLimiteIso = fechaLimite.toIso8601String();
+  // En el Controlador
+Future<List<Bitacora>> obtenerBitacorasPorFecha(DateTime fechaLimite) async {
+  try {
+    String fechaLimiteIso = fechaLimite.toIso8601String();
 
-      // Realizamos la consulta filtrando directamente en Firestore usando 'where'
-      final snapshot = await _dbServicio
-          .obtenerColeccion('bitacoras')
-          .where('fechaInicio', isLessThanOrEqualTo: fechaLimiteIso)
-          .get();
+    
+    final snapshot = await _dbServicio.obtenerDocumentosPorFiltro(
+      nombreColeccion: 'bitacoras',
+      campo: 'fechaInicio',
+      operacion: 'lessThanOrEqualTo',
+      valor: fechaLimiteIso,
+    );
 
-      // Mapeamos los documentos obtenidos al modelo de dominio Bitacora
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        return Bitacora(
-          id: data['id'] ?? '',
-          fechaInicio: DateTime.tryParse(data['fechaInicio'] ?? '') ?? DateTime.now(),
-          fechaFin: DateTime.tryParse(data['fechaFin'] ?? '') ?? DateTime.now(),
-          idParticipantes: List<String>.from(data['idParticipantes'] ?? []),
-          actividad: data['actividad'] ?? '',
-          observaciones: data['observaciones'] ?? '',
-        );
-      }).toList();
-    } catch (e) {
-      print('Error al filtrar bitácoras por fecha en Firestore: $e');
-      return [];
-    }
+    
+    return snapshot.docs.map((doc) {
+      final data = doc.data();
+      return Bitacora(
+        id: data['id'] ?? doc.id,
+        fechaInicio: DateTime.tryParse(data['fechaInicio'] ?? '') ?? DateTime.now(),
+        fechaFin: DateTime.tryParse(data['fechaFin'] ?? '') ?? DateTime.now(),
+        idParticipantes: List<String>.from(data['idParticipantes'] ?? []),
+        actividad: data['actividad'] ?? '',
+        observaciones: data['observaciones'] ?? '',
+      );
+    }).toList();
+  } catch (e) {
+    print('Error al filtrar bitácoras por fecha en el controlador: $e');
+    return [];
   }
+}
 
   Future<Bitacora?> buscarBitacora(String idBitacora) async {
   try {
     // Buscamos el documento en la colección 'bitacoras'
-    final doc = await _dbServicio
-        .obtenerColeccion('bitacoras')
-        .doc(idBitacora)
-        .get();
+    final doc = await _dbServicio.obtenerDocumentoPorId('bitacoras', idBitacora);
+        
 
     if (!doc.exists || doc.data() == null) {
       return null;
@@ -411,7 +408,7 @@ class ControladorGestionArqueologica {
 
     final data = doc.data()!;
 
-    // Reconvertimos las fechas ISO 8601 Strings a objetos DateTime de Dart
+    
     final DateTime fechaInicioEnum = data['fechaInicio'] != null 
         ? DateTime.parse(data['fechaInicio']) 
         : DateTime.now();

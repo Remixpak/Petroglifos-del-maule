@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
@@ -73,8 +74,15 @@ class _FormularioRegistroState extends State<FormularioRegistro> {
   // =========================================================================
   // ESTADO ESPECÍFICO: SECCIÓN USUARIOS
   // =========================================================================
-  final _nombreUserController = TextEditingController();
-  final _emailUserController = TextEditingController();
+  bool _esLogin = true; // Por defecto mostramos Login si no sabemos el rol aún
+  bool _esAdmin = false; // Almacena si el usuario firmado es administrador
+  bool _cargandoRol = true; // Para mostrar un indicador mientras verifica el rol
+  Rol _rolSeleccionado = Rol.investigador;
+  final _nombreController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _rolController = TextEditingController();
+  final _institucionController = TextEditingController();
 
   // =========================================================================
   //estados específicos de Bitácora
@@ -93,10 +101,12 @@ class _FormularioRegistroState extends State<FormularioRegistro> {
   @override
   void initState() {
     super.initState();
+    _verificarSiEsAdmin();
     if (widget.tipo == TipoRegistro.petroglifo) {
       _sitiosStream = _controladorNegocio.listarSitios();
     }
   }
+
 
   @override
   void dispose() {
@@ -107,10 +117,13 @@ class _FormularioRegistroState extends State<FormularioRegistro> {
     _codigoSitioController.dispose();
     _comunaSitioController.dispose();
     _descripcionSitioController.dispose();
-    _nombreUserController.dispose();
-    _emailUserController.dispose();
+    _nombreController.dispose();
+    _emailController.dispose();
     _actividadBitacoraController.dispose();
     _observacionesBitacoraController.dispose();
+    _passwordController.dispose();
+    _rolController.dispose();
+    _institucionController.dispose();
     super.dispose();
   }
 
@@ -277,14 +290,156 @@ class _FormularioRegistroState extends State<FormularioRegistro> {
   //=========================================================================
   //funciones de usuario
   //=========================================================================
-  void _procesarGuardadoUsuario() {
-    if (_nombreUserController.text.isEmpty || _emailUserController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Complete los campos obligatorios.')));
+  void _procesarGuardadoUsuario() async {
+
+    // === SECCIÓN DE PRINTS PARA DEPURACIÓN ===
+  print('=============================================');
+  print('DEBUG REGISTRO INVESTIGADOR:');
+  print('Email: "${_emailController.text}" (Largo: ${_emailController.text.length})');
+  print('Password: "${_passwordController.text}" (Largo: ${_passwordController.text.length})');
+  print('Nombre: "${_nombreController.text}" (Largo: ${_nombreController.text.length})');
+  print('Institución: "${_institucionController.text}" (Largo: ${_institucionController.text.length})');
+  print('Rol Seleccionado (Enum): $_rolSeleccionado');
+  print('=============================================');
+  if (_nombreController.text.trim().isEmpty || 
+      _emailController.text.trim().isEmpty ||
+      _passwordController.text.trim().isEmpty ||
+      _institucionController.text.trim().isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Por favor, completa todos los campos del investigador.')),
+    );
+    return;
+  }
+
+  setState(() => _guardando = true);
+
+  try {
+    // Delegamos la creación de la UserCredential y la escritura en Firestore al controlador
+    bool registroExitoso = await _controladorUsuario.registrarUsuario(
+      nombre: _nombreController.text.trim(),
+      correo: _emailController.text.trim(),
+      clave: _passwordController.text.trim(),
+      rol: _rolSeleccionado,
+      institucion: _institucionController.text.trim(), 
+    );
+
+    if (registroExitoso) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('¡Investigador registrado correctamente en el sistema!')),
+      );
+      
+      // Limpiamos los campos específicos de registro para dejar el formulario listo
+      _nombreController.clear();
+      _rolController.clear();
+      _institucionController.clear();
+      
+      // Opcional: regresar a la vista de login tras registrar exitosamente
+      setState(() => _esLogin = true);
+    } else {
+      throw Exception('El controlador no pudo completar el registro.');
+    }
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Error al registrar usuario: $e')),
+    );
+  } finally {
+    setState(() => _guardando = false);
+  }
+}
+
+  void _procesarLogin() async {
+  setState(() => _guardando = true);
+
+  try {
+    // Invocamos al método de autenticación del controlador
+    // Recuerda que este método debe llamar internamente a: FirebaseAuth.instance.signInWithEmailAndPassword
+    bool loginExitoso = await _controladorUsuario.iniciarSesion(
+      email: _emailController.text.trim(),
+      password: _passwordController.text.trim(),
+    );
+
+    if (loginExitoso) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('¡Bienvenido al sistema! Acceso concedido.')),
+      );
+      
+      // Rediriges a la pantalla principal de la app o haces un pop si es necesario
+      Navigator.pop(context); 
+    } else {
+      throw Exception('Credenciales incorrectas o usuario no registrado.');
+    }
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Error al iniciar sesión: $e')),
+    );
+  } finally {
+    setState(() => _guardando = false);
+  }
+}
+
+  void _procesarAutenticacion() {
+  // Validaciones rápidas antes de disparar Firebase
+  if (_emailController.text.trim().isEmpty || _passwordController.text.trim().isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Por favor, rellena el correo y la contraseña.')),
+    );
+    return;
+  }
+
+  // Bifurcamos el flujo según la pantalla activa
+  if (_esLogin) {
+    _procesarLogin();
+  } else {
+    _procesarGuardadoUsuario();
+  }
+}
+
+  
+Future<void> _verificarSiEsAdmin() async {
+  try {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      if (!mounted) return; // <--- Validación de seguridad
+      setState(() {
+        _esAdmin = false;
+        _esLogin = true;
+        _cargandoRol = false;
+      });
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Funcionalidad de usuario lista en backend.')));
-    Navigator.pop(context);
+
+    // Esperamos la respuesta de la base de datos
+    final usuarioAnclado = await _controladorUsuario.buscarUsuario(user.uid);
+
+    if (!mounted) return; // <--- Doble seguridad después de un await pesado
+
+    if (usuarioAnclado != null) {
+      // Usamos .name si es un Enum, o lowercase directo si contiene texto
+      final String rolStr = usuarioAnclado.rol.toString().toLowerCase();
+
+      setState(() {
+        // CORRECCIÓN: Validamos de forma flexible si contiene la palabra 'administrador' o 'admin'
+        _esAdmin = rolStr.contains('administrador') || rolStr.contains('admin');
+        
+        // REGLA: Si es admin -> muestra registro (_esLogin = false)
+        // Si NO es admin -> fuerza login (_esLogin = true)
+        _esLogin = !_esAdmin; 
+      });
+    } else {
+      setState(() {
+        _esAdmin = false;
+        _esLogin = true;
+      });
+    }
+  } catch (e) {
+    print('Error al verificar privilegios de administrador: $e');
+  } finally {
+    // El bloque finally siempre se ejecuta, también necesita protección
+    if (mounted) {
+      setState(() => _cargandoRol = false);
+    }
   }
+}
 
   //=========================================================================
   //funciones de bitacoras
@@ -669,12 +824,12 @@ class _FormularioRegistroState extends State<FormularioRegistro> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         TextField(
-          controller: _nombreUserController,
+          controller: _nombreController,
           decoration: const InputDecoration(labelText: 'Nombre Completo *', border: OutlineInputBorder()),
         ),
         const SizedBox(height: 12),
         TextField(
-          controller: _emailUserController,
+          controller: _emailController,
           keyboardType: TextInputType.emailAddress,
           decoration: const InputDecoration(labelText: 'Correo Electrónico *', border: OutlineInputBorder()),
         ),
@@ -805,7 +960,7 @@ class _FormularioRegistroState extends State<FormularioRegistro> {
     );
   }
 
- Widget _construirFormularioReporteTecnico() {
+  Widget _construirFormularioReporteTecnico() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -858,6 +1013,172 @@ class _FormularioRegistroState extends State<FormularioRegistro> {
     );
   }
 
+  Widget _construirFormularioAutenticacion() {
+  
+  if (_cargandoRol) {
+    return const Center(
+      child: Padding(
+        padding: EdgeInsets.all(24.0),
+        child: CircularProgressIndicator(color: Colors.indigo),
+      ),
+    );
+  }
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Text(
+        _esLogin ? 'Acceso al Sistema' : 'Registro de Nuevo Investigador',
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.indigo),
+      ),
+      const SizedBox(height: 8),
+      Text(
+        _esLogin 
+            ? 'Introduce tus credenciales institucionales para acceder.' 
+            : 'Completa todos los campos para dar de alta un nuevo perfil arqueológico en el sistema.',
+        style: const TextStyle(color: Colors.grey),
+      ),
+      const SizedBox(height: 20),
+
+      // ================= CAMPOS COMUNES =================
+      Card(
+        elevation: 2,
+        margin: const EdgeInsets.only(bottom: 12),
+        child: TextFormField(
+          controller: _emailController, // Asegúrate de declararlo en tu archivo
+          decoration: const InputDecoration(
+            labelText: 'Correo Electrónico',
+            prefixIcon: Icon(Icons.email_rounded, color: Colors.indigo),
+            border: InputBorder.none,
+            contentPadding: EdgeInsets.all(16),
+          ),
+          keyboardType: TextInputType.emailAddress,
+        ),
+      ),
+      Card(
+        elevation: 2,
+        margin: const EdgeInsets.only(bottom: 12),
+        child: TextFormField(
+          controller: _passwordController, // Asegúrate de declararlo en tu archivo
+          obscureText: true,
+          decoration: const InputDecoration(
+            labelText: 'Contraseña',
+            prefixIcon: Icon(Icons.lock_rounded, color: Colors.indigo),
+            border: InputBorder.none,
+            contentPadding: EdgeInsets.all(16),
+          ),
+        ),
+      ),
+      
+      // ================= CAMPOS DE REGISTRO (Solo si _esLogin es false) =================
+if (!_esLogin) ...[
+  Card(
+    elevation: 2,
+    margin: const EdgeInsets.only(bottom: 12),
+    child: TextFormField(
+      controller: _nombreController,
+      decoration: const InputDecoration(
+        labelText: 'Nombre Completo',
+        prefixIcon: Icon(Icons.person_rounded, color: Colors.indigo),
+        border: InputBorder.none,
+        contentPadding: EdgeInsets.all(16),
+        
+      ),
+    ),
+  ),
+  Card(
+    elevation: 2,
+    margin: const EdgeInsets.only(bottom: 12),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+      child: DropdownButtonFormField<Rol>(
+        value: _rolSeleccionado,
+        decoration: const InputDecoration(
+          labelText: 'Rol / Cargo del Usuario',
+          prefixIcon: Icon(Icons.badge_rounded, color: Colors.indigo),
+          border: InputBorder.none, // Mantiene la estética limpia de tus tarjetas
+        ),
+        // Definimos las opciones idénticas a como las espera tu Enum/Controlador
+        items: const [
+          DropdownMenuItem(
+            value: Rol.investigador, 
+            child: Text('Investigador / Arqueólogo'),
+          ),
+          DropdownMenuItem(
+            value: Rol.administrador, 
+            child: Text('Administrador de Sistema'),
+          ),
+        ],
+        onChanged: (nuevoValor) {
+          if (nuevoValor != null) {
+            setState(() {
+              _rolSeleccionado = nuevoValor;
+            });
+          }
+        },
+      ),
+    ),
+  ),
+  // NUEVO CAMPO: Institución
+  Card(
+    elevation: 2,
+    margin: const EdgeInsets.only(bottom: 12),
+    child: TextFormField(
+      controller: _institucionController,
+      decoration: const InputDecoration(
+        labelText: 'Institución / Universidad',
+        prefixIcon: Icon(Icons.account_balance_rounded, color: Colors.indigo),
+        border: InputBorder.none,
+        contentPadding: EdgeInsets.all(16),
+      ),
+    ),
+  ),
+],
+
+      const SizedBox(height: 40),
+
+      // ================= BOTÓN PRINCIPAL / ESTADO DE CARGA =================
+      _guardando
+          ? Column(
+              children: [
+                const CircularProgressIndicator(color: Colors.indigo),
+                const SizedBox(height: 12),
+                Text(
+                  _esLogin ? 'Iniciando sesión...' : 'Registrando credenciales en la base de datos...',
+                  style: const TextStyle(fontStyle: FontStyle.italic),
+                )
+              ],
+            )
+          : ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.all(16),
+                backgroundColor: Colors.indigo,
+                foregroundColor: Colors.white,
+              ),
+              icon: Icon(_esLogin ? Icons.login_rounded : Icons.person_add_alt_1_rounded),
+              onPressed: _procesarAutenticacion, // Tu función que ejecuta las llamadas al controlador
+              label: Text(_esLogin ? 'Iniciar Sesión' : 'Registrar Investigador', style: const TextStyle(fontSize: 16)),
+            ),
+
+      const SizedBox(height: 16),
+
+      // ================= ENLACE DINÁMICO (Sólo visible si es Administrador) =================
+      if (_esAdmin)
+        TextButton(
+          onPressed: () {
+            setState(() {
+              _esLogin = !_esLogin; // Conmuta la pantalla
+            });
+          },
+          child: Text(
+            _esLogin ? '¿Eres Administrador? Registra un usuario aquí' : 'Volver al Inicio de Sesión',
+            style: const TextStyle(color: Colors.indigo, fontWeight: FontWeight.bold),
+          ),
+        ),
+    ],
+  );
+}
+
   //=========================================================================
   //selectro de titulo
   //=========================================================================
@@ -878,7 +1199,7 @@ class _FormularioRegistroState extends State<FormularioRegistro> {
     switch (widget.tipo) {
       case TipoRegistro.petroglifo: return _construirFormularioPetroglifo();
       case TipoRegistro.sitio: return _construirFormularioSitio();
-      case TipoRegistro.usuario: return _construirFormularioUsuario();
+      case TipoRegistro.usuario: return _construirFormularioAutenticacion();
       case TipoRegistro.bitacora: return _construirFormularioBitacora();
       case TipoRegistro.reporte: return _construirFormularioReporteTecnico();
     }

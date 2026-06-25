@@ -1,5 +1,5 @@
 
-enum Rol { Administrador, Investigador }
+enum Rol { administrador, investigador }
 
 class Usuario
 {
@@ -19,4 +19,16 @@ class Usuario
     required this.rol,
     required this.institucion,
   });
+
+  Map<String, dynamic> toFirestore() {
+    return {
+      'id': id,
+      'nombre': nombre,
+      'correo': correo,
+      'clave': clave,
+      'estado': estado,
+      'rol': rol.name,
+      'institucion': institucion,
+    };
+  }
 }
