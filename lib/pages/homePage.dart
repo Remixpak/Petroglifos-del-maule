@@ -11,6 +11,7 @@ import 'package:software_petroglifos/pages/detallePetroglifo.dart';
 import 'package:software_petroglifos/pages/pantallaBitacora.dart';
 import 'package:software_petroglifos/pages/pantallaReportes.dart';
 import 'package:software_petroglifos/pages/panelUsuarios.dart';
+import 'package:software_petroglifos/pages/pantallaSugerencia.dart';
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.title});
@@ -68,8 +69,22 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
-  void _mostrarSugerencias() {
-    print("Mostrando sección de sugerencias...");
+  void _irASugerencias({required bool esUsuarioActivo}) {
+    if (esUsuarioActivo) {
+      // Si el investigador está autenticado y activo, va al panel de gestión
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const PantallaSugerencia()),
+      );
+    } else {
+      // Si es un usuario anónimo o público, va directo al formulario de registro en el buzón
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const FormularioRegistro("Sugerencia", tipo: TipoRegistro.sugerencia),
+        ),
+      );
+    }
   }
 
   @override
@@ -227,45 +242,51 @@ class _MyHomePageState extends State<MyHomePage> {
               bottomNavigationBar: NavigationBar(
                 selectedIndex: _indiceActual,
                 onDestinationSelected: (int index) {
-                  setState(() {
-                    _indiceActual = index;
-                  });
+  if (estaLogeadoYActivo) {
+    // Si está activo, maneja el índice normalmente
+    setState(() {
+      _indiceActual = index;
+    });
 
-                  // MODIFICACIÓN: Comprobación de seguridad en la navegación interna de la barra
-                  if (estaLogeadoYActivo) {
-                    switch (index) {
-                      case 0:
-                        _irARegistroPetroglifo();
-                        break;
-                      case 1:
-                        _irASitios();
-                        break;
-                      case 2:
-                        _irABitacoras();
-                        break;
-                      case 3:
-                        _irAReportes();
-                        break;
-                      case 4:
-                        _mostrarSugerencias();
-                        break;
-                    }
+    switch (index) {
+      case 0:
+        _irARegistroPetroglifo();
+        break;
+      case 1:
+        _irASitios();
+        break;
+      case 2:
+        _irABitacoras();
+        break;
+      case 3:
+        _irAReportes();
+        break;
+      case 4:
+        _irASugerencias(esUsuarioActivo: estaLogeadoYActivo);
+        break;
+    }
 
-                    if (index != 4) {
-                      setState(() => _indiceActual = 0);
-                    }
-                  } else {
-                    switch (index) {
-                      case 0:
-                        print("Se mantiene en la pantalla de Inicio pública.");
-                        break;
-                      case 1:
-                        _mostrarSugerencias();
-                        setState(() => _indiceActual = 0);
-                        break;
-                    }
-                  }
-                },
+    if (index != 4) {
+      setState(() => _indiceActual = 0);
+    }
+  } else {
+    // Si es un usuario PÚBLICO:
+    // NO actualizamos _indiceActual con el valor 'index' si presionó el 1,
+    // así evitamos que rompa el rango de los 2 botones disponibles (0 y 1).
+    switch (index) {
+      case 0:
+        setState(() {
+          _indiceActual = 0;
+        });
+        print("Se mantiene en la pantalla de Inicio pública.");
+        break;
+      case 1:
+        // Se ejecuta la navegación externa manteniendo el índice visual fijo en 0
+        _irASugerencias(esUsuarioActivo: estaLogeadoYActivo);
+        break;
+    }
+  }
+},
                 // MODIFICACIÓN: Modificación dinámica de los ítems disponibles según la bandera combinada
                 destinations: estaLogeadoYActivo
                     ? const [

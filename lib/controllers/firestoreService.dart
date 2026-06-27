@@ -35,6 +35,10 @@ class FirestoreService {
     await _firestore.collection('usuarios').doc(id).set(data);
   }
 
+  Future<void> guardarSugerencia(String id, Map<String, dynamic> data) async {
+    await _firestore.collection('sugerencias').doc(id).set(data);
+  }
+
   Future<QuerySnapshot<Map<String, dynamic>>> obtenerDocumentosPorFiltro({
     required String nombreColeccion,
     required String campo,

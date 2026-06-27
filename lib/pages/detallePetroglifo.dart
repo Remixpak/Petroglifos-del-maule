@@ -1,10 +1,11 @@
 import 'dart:convert';
-import 'dart:io';
+
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
+
 
 // Importaciones de tus modelos y controladores
 import 'package:software_petroglifos/controllers/controladorGestionArqueologica.dart';
+import 'package:software_petroglifos/controllers/controladorGeneracionPDF.dart'; // <-- NUEVO IMPORT
 import 'package:software_petroglifos/models/petroglifo.dart';
 import 'package:software_petroglifos/models/fichaTecnica.dart';
 
@@ -19,9 +20,11 @@ class DetallePetroglifo extends StatefulWidget {
 
 class _DetallePetroglifoState extends State<DetallePetroglifo> {
   final _controladorNegocio = ControladorGestionArqueologica();
+  final _controladorPDF = ControladorGeneracionPDF(); // <-- Instancia del controlador de PDF
   
   FichaTecnica? _fichaTecnica;
   bool _cargandoFicha = true;
+  bool _exportandoPDF = false; // Estado local para mostrar un spinner al descargar
 
   @override
   void initState() {
@@ -41,6 +44,43 @@ class _DetallePetroglifoState extends State<DetallePetroglifo> {
     }
   }
 
+  // MÉTODO NUEVO: Orquesta la generación y descarga nativa multiplataforma
+  Future<void> _descargarFichaPDF() async {
+    if (_fichaTecnica == null) return;
+
+    setState(() => _exportandoPDF = true);
+
+    try {
+      // Pasamos el ID de la ficha y el nombre que queremos sugerir para el archivo .pdf
+      await _controladorPDF.descargarPDF(
+        _controladorPDF.generarFichaTecnica(_fichaTecnica!.id),
+        "Ficha_Tecnica_${widget.petroglifo.id}",
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Documento PDF generado de manera exitosa.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al generar el PDF: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _exportandoPDF = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -48,6 +88,26 @@ class _DetallePetroglifoState extends State<DetallePetroglifo> {
         title: Text('Detalle: ${widget.petroglifo.id}'),
         backgroundColor: Colors.brown.shade700,
         foregroundColor: Colors.white,
+        actions: [
+          // BOTÓN DE DESCARGA EN EL APPBAR (Habilitado solo si existe la ficha técnica)
+          if (_fichaTecnica != null)
+            _exportandoPDF
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16.0),
+                    child: Center(
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                      ),
+                    ),
+                  )
+                : IconButton(
+                    icon: const Icon(Icons.picture_as_pdf_rounded),
+                    tooltip: 'Exportar Ficha a PDF',
+                    onPressed: _descargarFichaPDF,
+                  ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -100,8 +160,6 @@ class _DetallePetroglifoState extends State<DetallePetroglifo> {
                       itemCount: widget.petroglifo.imagenes.length,
                       itemBuilder: (context, index) {
                         final img = widget.petroglifo.imagenes[index];
-                        
-                        // Determinamos si es la imagen principal para destacarla visualmente
                         bool esPrincipal = img.isPrincipal;
 
                         return Container(
@@ -119,7 +177,6 @@ class _DetallePetroglifoState extends State<DetallePetroglifo> {
                             child: Stack(
                               fit: StackFit.expand,
                               children: [
-                                // Decodificación del Algoritmo de Ronald (Base64) o lectura de URL
                                 img.url.isNotEmpty
                                     ? Image.memory(base64Decode(img.url), fit: BoxFit.cover)
                                     : const Icon(Icons.broken_image, size: 40),
@@ -149,11 +206,23 @@ class _DetallePetroglifoState extends State<DetallePetroglifo> {
             // ==========================================
             // SECCIÓN 3: FICHA TÉCNICA ASOCIADA (ASÍNCRONA)
             // ==========================================
-            const Row(
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Icon(Icons.assignment_rounded, color: Colors.brown),
-                SizedBox(width: 8),
-                Text('Ficha Técnica Vinculada', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.brown)),
+                const Row(
+                  children: [
+                    Icon(Icons.assignment_rounded, color: Colors.brown),
+                    SizedBox(width: 8),
+                    Text('Ficha Técnica Vinculada', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.brown)),
+                  ],
+                ),
+                // SECCIÓN DE DESCARGA SECUNDARIA: Botón directo junto al título de la sección
+                if (_fichaTecnica != null && !_exportandoPDF)
+                  TextButton.icon(
+                    onPressed: _descargarFichaPDF,
+                    icon: const Icon(Icons.download_rounded, size: 20, color: Colors.indigo),
+                    label: const Text('Descargar PDF', style: TextStyle(color: Colors.indigo)),
+                  )
               ],
             ),
             const Divider(color: Colors.brown),
@@ -209,7 +278,6 @@ class _DetallePetroglifoState extends State<DetallePetroglifo> {
                           trailing: IconButton(
                             icon: const Icon(Icons.download_rounded),
                             onPressed: () {
-                              // Aquí puedes implementar la apertura o descarga del archivo físico en caché
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(content: Text('Ruta de archivo: ${archivo.rutaArchivo}')),
                               );
@@ -225,7 +293,6 @@ class _DetallePetroglifoState extends State<DetallePetroglifo> {
     );
   }
 
-  // Widget auxiliar para mantener limpio el diseño de la Ficha Técnica
   Widget _construirItemFicha(String titulo, String valor) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),

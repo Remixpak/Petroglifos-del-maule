@@ -11,6 +11,7 @@ import 'package:file_selector_platform_interface/file_selector_platform_interfac
 // Importaciones de tus modelos y controladores del proyecto
 import 'package:software_petroglifos/controllers/controladorGestionArqueologica.dart';
 import 'package:software_petroglifos/controllers/controladorUsuario.dart';
+import 'package:software_petroglifos/controllers/controladorSugerencias.dart';
 import 'package:software_petroglifos/models/fichaTecnica.dart';
 import 'package:software_petroglifos/models/sitio.dart';
 import 'package:software_petroglifos/models/usuario.dart';
@@ -25,6 +26,7 @@ enum TipoRegistro {
   usuario,
   bitacora,
   reporte,
+  sugerencia,
 }
 
 class FormularioRegistro extends StatefulWidget {
@@ -97,6 +99,11 @@ class _FormularioRegistroState extends State<FormularioRegistro> {
   //================================================================
   DateTime _rangoFechaReporte = DateTime.now();
   bool _buscandoBitacoras = false;
+  //================================================================
+  //variables sugerencia
+  //================================================================
+  final _descripcionSugerenciaController = TextEditingController();
+  final _controladorSugerencia = Controladorsugerencias();
 
   @override
   void initState() {
@@ -398,7 +405,6 @@ class _FormularioRegistroState extends State<FormularioRegistro> {
   }
 }
 
-  
 Future<void> _verificarSiEsAdmin() async {
   try {
     final user = FirebaseAuth.instance.currentUser;
@@ -603,6 +609,43 @@ Future<void> _verificarSiEsAdmin() async {
   }
 }
 
+  //=========================================================================
+  //funciones sugerencias
+  //=========================================================================
+  void _procesarGuardadoSugerencia() async {
+    if (_descripcionSugerenciaController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Por favor, ingrese una descripción para la sugerencia.')),
+      );
+      return;
+    }
+
+    setState(() => _guardando = true);
+
+    // Generamos un ID único simple basado en el timestamp actual
+    String idUnico = "SUG-${DateTime.now().millisecondsSinceEpoch}";
+
+    bool exito = await _controladorSugerencia.registrarSugerencia(
+      id: idUnico,
+      descripcion: _descripcionSugerenciaController.text,
+      fecha: DateTime.now(), // Fecha actual del envío
+      estado: false,         // Por defecto inicia como falsa/pendiente de revisión
+    );
+
+    setState(() => _guardando = false);
+
+    if (exito) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('¡Sugerencia registrada con éxito! Gracias por su aporte.')),
+      );
+      _descripcionSugerenciaController.clear(); // Limpiamos el buffer
+      Navigator.pop(context);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Hubo un error al guardar la sugerencia.')),
+      );
+    }
+  }
   //=========================================================================
   //formularios 
   //=========================================================================
@@ -822,8 +865,6 @@ Future<void> _verificarSiEsAdmin() async {
       ),
     );
   }
-
-  
 
   Widget _construirFormularioBitacora() {
     return StreamBuilder<List<Usuario>>(
@@ -1190,6 +1231,52 @@ Future<void> _verificarSiEsAdmin() async {
   );
 }
 
+  Widget _construirFormularioSugerencia() {
+    final double width = MediaQuery.of(context).size.width;
+    final double paddingHorizontal = width > 600 ? width * 0.15 : 0.0;
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: paddingHorizontal),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Buzón de Sugerencias de descubrimiento',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blueGrey),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Describa cualquier posible ubicación de petroglifo.',
+            style: TextStyle(fontSize: 13, color: Colors.grey),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          TextField(
+            controller: _descripcionSugerenciaController,
+            maxLines: 6,
+            maxLength: 500,
+            decoration: const InputDecoration(
+              labelText: 'Descripción detallada de la sugerencia *',
+              alignLabelWithHint: true,
+              border: OutlineInputBorder(),
+              hintText: 'Ej: En calabozos hay una piedra extraña con lo que parece ser pintura blanca',
+            ),
+          ),
+          const SizedBox(height: 30),
+          _guardando
+              ? const Center(child: CircularProgressIndicator())
+              : ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(padding: const EdgeInsets.all(16)),
+                  icon: const Icon(Icons.send_rounded),
+                  label: const Text('Enviar Sugerencia', style: TextStyle(fontSize: 16)),
+                  onPressed: _procesarGuardadoSugerencia,
+                ),
+        ],
+      ),
+    );
+  }
+
   //=========================================================================
   //selectro de titulo
   //=========================================================================
@@ -1200,6 +1287,7 @@ Future<void> _verificarSiEsAdmin() async {
       case TipoRegistro.usuario: return 'Registrar Nuevo Usuario';
       case TipoRegistro.bitacora: return 'Nueva Entrada de Bitácora';
       case TipoRegistro.reporte: return 'Generar Reporte';
+      case TipoRegistro.sugerencia: return 'Generar Sugenercia';
     }
   }
 
@@ -1213,6 +1301,7 @@ Future<void> _verificarSiEsAdmin() async {
       case TipoRegistro.usuario: return _construirFormularioAutenticacion();
       case TipoRegistro.bitacora: return _construirFormularioBitacora();
       case TipoRegistro.reporte: return _construirFormularioReporteTecnico();
+      case TipoRegistro.sugerencia: return _construirFormularioSugerencia();
     }
   }
 

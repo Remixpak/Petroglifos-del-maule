@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart'; 
 import 'package:software_petroglifos/controllers/controladorGestionArqueologica.dart';
 import 'package:software_petroglifos/controllers/controladorUsuario.dart';
+import 'package:software_petroglifos/controllers/controladorGeneracionPDF.dart'; // <-- NUEVO IMPORT
 import 'package:software_petroglifos/models/reporteTecnico.dart';
 import 'package:software_petroglifos/models/bitacora.dart'; 
 import 'package:software_petroglifos/pages/formularioRegistro.dart';
@@ -16,6 +17,11 @@ class PantallaReporte extends StatefulWidget {
 class _PantallaReporteState extends State<PantallaReporte> {
   final _controlador = ControladorGestionArqueologica();
   final _controladorUsuario = ControladorUsuario();
+  final _controladorPDF = ControladorGeneracionPDF(); // <-- Instancia del controlador de PDF
+
+  // Mapa para controlar de manera independiente el estado de carga/descarga de cada PDF usando su ID
+  final Map<String, bool> _exportandoPDFs = {};
+
   void _irARegistroReporte() {
     Navigator.push(
       context,
@@ -23,6 +29,41 @@ class _PantallaReporteState extends State<PantallaReporte> {
         builder: (context) => const FormularioRegistro("Reporte Técnico", tipo: TipoRegistro.reporte),
       ),
     );
+  }
+
+  // MÉTODO NUEVO: Orquesta la descarga asíncrona del Reporte Técnico
+  Future<void> _descargarReportePDF(ReporteTecnico reporte) async {
+    setState(() => _exportandoPDFs[reporte.id] = true);
+
+    try {
+      // Disparamos la generación y posterior guardado nativo multiplataforma (Android/Windows)
+      await _controladorPDF.descargarPDF(
+        _controladorPDF.generarReporteTecnico(reporte.id),
+        "Reporte_Tecnico_${reporte.id}",
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Reporte exportado a PDF de manera exitosa.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al procesar el reporte: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _exportandoPDFs[reporte.id] = false);
+      }
+    }
   }
 
   @override
@@ -64,6 +105,9 @@ class _PantallaReporteState extends State<PantallaReporte> {
               
               final String fechaGenFormateada = DateFormat('dd/MM/yyyy HH:mm').format(reporte.fechaGeneracion);
               final String rangoFormateado = DateFormat('dd/MM/yyyy').format(reporte.rangoFecha);
+              
+              // Verificamos si esta tarjeta específica está procesando su descarga
+              bool estaDescargando = _exportandoPDFs[reporte.id] ?? false;
 
               return Card(
                 elevation: 3,
@@ -79,6 +123,18 @@ class _PantallaReporteState extends State<PantallaReporte> {
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                     ),
                     subtitle: Text('Rango de cobertura: $rangoFormateado'),
+                    // NUEVA SECCIÓN: Botón interactivo integrado en el extremo derecho de la fila
+                    trailing: estaDescargando
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2.5),
+                          )
+                        : IconButton(
+                            icon: const Icon(Icons.picture_as_pdf_rounded, color: Colors.brown),
+                            tooltip: 'Descargar Documento PDF',
+                            onPressed: () => _descargarReportePDF(reporte),
+                          ),
                     children: [
                       Padding(
                         padding: const EdgeInsets.all(16.0),
@@ -130,64 +186,61 @@ class _PantallaReporteState extends State<PantallaReporte> {
                                     final bitacora = bitacoraSnapshot.data!;
 
                                     return Container(
-  width: double.infinity,
-  margin: const EdgeInsets.only(bottom: 8.0),
-  padding: const EdgeInsets.all(12.0),
-  decoration: BoxDecoration(
-    color: Colors.grey.withOpacity(0.06),
-    borderRadius: BorderRadius.circular(8),
-    border: Border.all(color: Colors.grey.withOpacity(0.2)),
-  ),
-  child: Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(
-        'Actividad: ${bitacora.actividad}', 
-        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)
-      ),
-      const SizedBox(height: 4),
-      
-      // NUEVA IMPLEMENTACIÓN: Renderizar nombres en lugar de IDs
-      if (bitacora.idParticipantes.isEmpty)
-        const Text(
-          'Participantes: Sin asignar',
-          style: TextStyle(fontSize: 13, color: Colors.grey),
-        )
-      else
-        FutureBuilder<List<String>>(
-          // Mapeamos los IDs a promesas que buscan cada nombre en paralelo
-          future: Future.wait(
-            bitacora.idParticipantes.map((id) async {
-              final usuario = await _controladorUsuario.buscarUsuario(id);
-              return usuario?.nombre ?? id;
-            }),
-          ),
-          builder: (context, nombresSnapshot) {
-            if (nombresSnapshot.connectionState == ConnectionState.waiting) {
-              return const Text(
-                'Cargando participantes...',
-                style: TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: Colors.grey),
-              );
-            }
+                                      width: double.infinity,
+                                      margin: const EdgeInsets.only(bottom: 8.0),
+                                      padding: const EdgeInsets.all(12.0),
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.withOpacity(0.06),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: Colors.grey.withOpacity(0.2)),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Actividad: ${bitacora.actividad}', 
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)
+                                          ),
+                                          const SizedBox(height: 4),
+                                          
+                                          if (bitacora.idParticipantes.isEmpty)
+                                            const Text(
+                                              'Participantes: Sin asignar',
+                                              style: TextStyle(fontSize: 13, color: Colors.grey),
+                                            )
+                                          else
+                                            FutureBuilder<List<String>>(
+                                              future: Future.wait(
+                                                bitacora.idParticipantes.map((id) async {
+                                                  final usuario = await _controladorUsuario.buscarUsuario(id);
+                                                  return usuario?.nombre ?? id;
+                                                }),
+                                              ),
+                                              builder: (context, nombresSnapshot) {
+                                                if (nombresSnapshot.connectionState == ConnectionState.waiting) {
+                                                  return const Text(
+                                                    'Cargando participantes...',
+                                                    style: TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: Colors.grey),
+                                                  );
+                                                }
 
-            // Si hay un error, volvemos de manera segura a mostrar los IDs para no romper la vista
-            final nombres = nombresSnapshot.data ?? bitacora.idParticipantes;
-            
-            return Text(
-              'Participantes: ${nombres.join(", ")}',
-              style: TextStyle(fontSize: 13, color: Colors.grey[800]),
-            );
-          },
-        ),
-        
-      const SizedBox(height: 4),
-      Text(
-        'Observaciones: ${bitacora.observaciones.isNotEmpty ? bitacora.observaciones : "Sin observaciones"}',
-        style: const TextStyle(fontSize: 13, fontStyle: FontStyle.italic),
-      ),
-    ],
-  ),
-);
+                                                final nombres = nombresSnapshot.data ?? bitacora.idParticipantes;
+                                                
+                                                return Text(
+                                                  'Participantes: ${nombres.join(", ")}',
+                                                  style: TextStyle(fontSize: 13, color: Colors.grey[800]),
+                                                );
+                                              },
+                                            ),
+                                            
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'Observaciones: ${bitacora.observaciones.isNotEmpty ? bitacora.observaciones : "Sin observaciones"}',
+                                            style: const TextStyle(fontSize: 13, fontStyle: FontStyle.italic),
+                                          ),
+                                        ],
+                                      ),
+                                    );
                                   },
                                 );
                               }).toList(),
