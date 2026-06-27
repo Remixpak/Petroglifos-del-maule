@@ -24,11 +24,10 @@ class FirestoreService {
   }
 
   Future<void> guardarBitacora(String id, Map<String, dynamic> data) async {
-    // Registra el documento en la colección 'bitacoras' usando el ID provisto
     await _firestore.collection('bitacoras').doc(id).set(data);
   }
+  
   Future<void> guardarReporte(String id, Map<String, dynamic> data) async {
-    // Registra el documento en la colección 'reportes' usando el ID provisto
     await _firestore.collection('reportes').doc(id).set(data);
   }
 
@@ -36,32 +35,53 @@ class FirestoreService {
     await _firestore.collection('usuarios').doc(id).set(data);
   }
 
-  // En FirestoreService
-Future<QuerySnapshot<Map<String, dynamic>>> obtenerDocumentosPorFiltro({
-  required String nombreColeccion,
-  required String campo,
-  required String operacion,
-  required dynamic valor,
-}) async {
-  Query<Map<String, dynamic>> query = _firestore.collection(nombreColeccion);
+  Future<QuerySnapshot<Map<String, dynamic>>> obtenerDocumentosPorFiltro({
+    required String nombreColeccion,
+    required String campo,
+    required String operacion,
+    required dynamic valor,
+  }) async {
+    Query<Map<String, dynamic>> query = _firestore.collection(nombreColeccion);
 
-  if (operacion == 'lessThanOrEqualTo') {
-    query = query.where(campo, isLessThanOrEqualTo: valor);
-  } else if (operacion == 'isEqualTo') {
-    query = query.where(campo, isEqualTo: valor);
+    if (operacion == 'lessThanOrEqualTo') {
+      query = query.where(campo, isLessThanOrEqualTo: valor);
+    } else if (operacion == 'isEqualTo') {
+      query = query.where(campo, isEqualTo: valor);
+    }
+
+    return await query.get();
   }
-  
-
-  return await query.get();
-}
-
 
   Future<DocumentSnapshot<Map<String, dynamic>>> obtenerDocumentoPorId(
-    String nombreColeccion, String docId) async {
-  return await _firestore.collection(nombreColeccion).doc(docId).get();
-}
-  // Streams de datos para el controlador
+      String nombreColeccion, String docId) async {
+    return await _firestore.collection(nombreColeccion).doc(docId).get();
+  }
+
   Stream<QuerySnapshot<Map<String, dynamic>>> obtenerStreamColeccion(String coleccion) {
     return _firestore.collection(coleccion).snapshots();
+  }
+
+  // ====================================================================
+  // NUEVO MÉTODO GENÉRICO DE ACTUALIZACIÓN
+  // ====================================================================
+  /// Actualiza campos específicos de cualquier documento en cualquier colección.
+  /// 
+  /// [nombreColeccion] es el nodo en Firestore (ej: 'usuarios', 'petroglifos').
+  /// [id] es el identificador único del documento.
+  /// [datosAActualizar] contiene los pares clave-valor que se van a modificar.
+  Future<void> actualizarDocumentoGenerico({
+    required String nombreColeccion,
+    required String id,
+    required Map<String, dynamic> datosAActualizar,
+  }) async {
+    try {
+      await _firestore
+          .collection(nombreColeccion)
+          .doc(id)
+          .update(datosAActualizar);
+    } catch (e) {
+      print("Error genérico al actualizar en la colección $nombreColeccion: $e");
+      rethrow; // Lanza el error para que el controlador pueda manejarlo (ej: mostrar un diálogo)
+    }
   }
 }

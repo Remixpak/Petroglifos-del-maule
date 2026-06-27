@@ -36,7 +36,7 @@ class ControladorUsuario {
         clave: clave.trim(),
         rol: rol,
         institucion: institucion.trim(),
-        estado: true, 
+        isActive: true, 
       );
 
       
@@ -49,6 +49,7 @@ class ControladorUsuario {
       print('Error en el registro: $e');
       return false;
     }
+    
   }
 
   /// Lista los usuarios desde Firestore en tiempo real como un Stream de objetos [Usuario]
@@ -68,7 +69,7 @@ class ControladorUsuario {
           nombre: data['nombre'] ?? 'Sin Nombre',
           correo: data['correo'] ?? '',
           clave: '', // <--- AQUÍ: Pasamos string vacío ya que la clave no se guarda en Firestore
-          estado: data['estado'] ?? true,
+          isActive: data['isActive'] ?? true,
           rol: rolUsuario,
           institucion: data['institucion'] ?? '',
         );
@@ -94,7 +95,7 @@ class ControladorUsuario {
       nombre: data['nombre'] ?? 'Sin Nombre',
       correo: data['correo'] ?? '',
       clave: '', // <--- AQUÍ: Pasamos string vacío ya que la clave no se guarda en Firestore
-      estado: data['estado'] ?? true,
+      isActive: data['isActive'] ?? true,
       rol: Rol.values.firstWhere(
         (r) => r.name == data['rol'],
         orElse: () => Rol.investigador, // Corregido a tu capitalización exacta
@@ -122,5 +123,29 @@ class ControladorUsuario {
     print('Error de login en ControladorUsuario: $e');
     return false;
   }
-}
+  }
+
+  Future<bool> cerrarSesion() async {
+    try {
+      await _auth.signOut();
+      print('Sesión cerrada con éxito de Firebase Auth.');
+      return true;
+    } catch (e) {
+      print('Error al intentar cerrar sesión: $e');
+      return false;
+    }
+  }
+
+  Future<void> cambiarEstadoCuenta(String idUsuario, bool nuevoEstado) async {
+    try {
+      await _dbServicio.actualizarDocumentoGenerico(
+        nombreColeccion: 'usuarios',
+        id: idUsuario,
+        datosAActualizar: {'isActive': nuevoEstado},
+      );
+      print('Estado de la cuenta del usuario $idUsuario actualizado a $nuevoEstado');
+    } catch (e) {
+      print('Error al cambiar el estado de la cuenta del usuario $idUsuario: $e');
+    }
+  }
 }

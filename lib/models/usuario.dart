@@ -7,17 +7,19 @@ class Usuario
   final String nombre;
   final String correo;
   final String clave;
-  final bool estado;//Eliminar
+  final bool isActive;
   final Rol rol;
   final String institucion;
+
   Usuario({
     required this.id,
     required this.nombre,
     required this.correo,
     required this.clave,
-    required this.estado,
+    this.isActive = true,
     required this.rol,
     required this.institucion,
+    
   });
 
   Map<String, dynamic> toFirestore() {
@@ -26,7 +28,7 @@ class Usuario
       'nombre': nombre,
       'correo': correo,
       'clave': clave,
-      'estado': estado,
+      'isActive': isActive,
       'rol': rol.name,
       'institucion': institucion,
     };
