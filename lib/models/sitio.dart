@@ -1,27 +1,37 @@
 enum EstadoAcceso { publico, privado }
 
 class Sitio {
-  final String id;
-  final String nombre;
-  final String codigoInterno;
-  final String comuna;
-  final String descripcion;
-  final EstadoAcceso estadoAcceso;
-  final double latitud;
-  final double longitud;
-  final List<String> petroglifosIds; 
+  final String _id;
+  final String _nombre;
+  final String _codigoInterno;
+  final String _comuna;
+  final String _descripcion;
+  final EstadoAcceso _estadoAcceso;
+  final double _latitud;
+  final double _longitud;
+  final List<String> _petroglifosIds;
+
+  List<String> get petroglifosIds => _petroglifosIds;
+  String get id => _id;
+  String get nombre => _nombre;
+  String get codigoInterno => _codigoInterno;
+  String get comuna => _comuna;
+  String get descripcion => _descripcion;
+  EstadoAcceso get estadoAcceso => _estadoAcceso;
+  double get latitud => _latitud;
+  double get longitud => _longitud;
 
   Sitio({
-    required this.id,
-    required this.nombre,
-    required this.codigoInterno,
-    required this.comuna,
-    required this.descripcion,
-    required this.estadoAcceso,
-    required this.latitud,
-    required this.longitud,
+    required this._id,
+    required this._nombre,
+    required this._codigoInterno,
+    required this._comuna,
+    required this._descripcion,
+    required this._estadoAcceso,
+    required this._latitud,
+    required this._longitud,
     List<String>? petroglifosIds,
-  }) : petroglifosIds = petroglifosIds ?? [];
+  }) : _petroglifosIds = petroglifosIds ?? [];
 
   void AgregarPetroglifo(String petroglifoId) {
     if (!petroglifosIds.contains(petroglifoId)) {

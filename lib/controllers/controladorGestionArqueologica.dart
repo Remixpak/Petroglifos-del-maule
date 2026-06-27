@@ -20,7 +20,7 @@ class ControladorGestionArqueologica {
   // =========================================================================
   Future<Map<String, String>> transformacionDeRonald({
     required List<PlatformFile> fotosVisualizables, 
-    required List<imagen> imagenes
+    required List<Imagen> imagenes
   }) async {
     Map<String, String> resultadoBase64 = {};
     
@@ -53,8 +53,8 @@ class ControladorGestionArqueologica {
         final data = doc.data();
 
         final List<dynamic> imgsData = data['imagenes'] ?? [];
-        final List<imagen> listaImagenes = imgsData.map((img) {
-          return imagen(
+        final List<Imagen> listaImagenes = imgsData.map((img) {
+          return Imagen(
             id: img['id'] ?? '',
             nombreArchivo: img['nombreArchivo'] ?? '',
             tipoArchivo: img['tipoArchivo'] ?? '',
@@ -65,8 +65,8 @@ class ControladorGestionArqueologica {
         }).toList();
 
         final List<dynamic> arcData = data['archivosMultimedia'] ?? [];
-        final List<archivoMultimedia> listaMultimedia = arcData.map((arc) {
-          return archivoMultimedia(
+        final List<ArchivoMultimedia> listaMultimedia = arcData.map((arc) {
+          return ArchivoMultimedia(
             id: arc['id'] ?? '',
             nombreArchivo: arc['nombreArchivo'] ?? '',
             tipoArchivo: arc['tipoArchivo'] ?? '',
@@ -141,14 +141,14 @@ class ControladorGestionArqueologica {
       String nuevoPetroglifoId = await generarSiguienteCodigoPetroglifo();
 
       // 2. Estructuramos las entidades de imágenes con IDs únicos
-      List<imagen> listaImagenes = [];
+      List<Imagen> listaImagenes = [];
       for (int i = 0; i < fotosCandidatas.length; i++) {
         final fileCandidate = fotosCandidatas[i];
         String rutaSegura = (fileCandidate.path != null && fileCandidate.path!.isNotEmpty) 
             ? fileCandidate.path! 
             : 'memoria_cache_temporal';
 
-        listaImagenes.add(imagen(
+        listaImagenes.add(Imagen(
           id: 'img_${_uuid.v4()}',
           nombreArchivo: fileCandidate.name,
           tipoArchivo: 'image/jpeg',
@@ -159,12 +159,12 @@ class ControladorGestionArqueologica {
       }
 
       // 3. Estructuramos los archivos multimedia adicionales
-      List<archivoMultimedia> listaMultimedia = archivosExtra.map((file) {
+      List<ArchivoMultimedia> listaMultimedia = archivosExtra.map((file) {
         String rutaSeguraMultimedia = (file.path != null && file.path!.isNotEmpty) 
             ? file.path! 
             : 'multimedia_cache_temporal';
 
-        return archivoMultimedia(
+        return ArchivoMultimedia(
           id: 'arc_${_uuid.v4()}',
           nombreArchivo: file.name,
           tipoArchivo: file.extension ?? 'desconocido',

@@ -1,14 +1,19 @@
 class ReporteTecnico
 {
-  String id;
-  DateTime fechaGeneracion;
-  DateTime rangoFecha;
-  List<String> idBitacoras;
+  String _id;
+  DateTime _fechaGeneracion;
+  DateTime _rangoFecha;
+  List<String> _idBitacoras;
+
+  String get id => _id;
+  DateTime get fechaGeneracion => _fechaGeneracion;
+  DateTime get rangoFecha => _rangoFecha;
+  List<String> get idBitacoras => _idBitacoras;
   ReporteTecnico({
-    required this.id,
-    required this.fechaGeneracion,
-    required this.rangoFecha,
-    required this.idBitacoras,
+    required this._id,
+    required this._fechaGeneracion,
+    required this._rangoFecha,
+    required this._idBitacoras,
   });
 
 

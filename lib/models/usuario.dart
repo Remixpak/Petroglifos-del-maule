@@ -3,34 +3,43 @@ enum Rol { administrador, investigador }
 
 class Usuario
 {
-  final String id;
-  final String nombre;
-  final String correo;
-  final String clave;
-  final bool isActive;
-  final Rol rol;
-  final String institucion;
+  final String _id;
+  final String _nombre;
+  final String _correo;
+  final String _clave;
+  final bool _isActive;
+  final Rol _rol;
+  final String _institucion;
 
   Usuario({
-    required this.id,
-    required this.nombre,
-    required this.correo,
-    required this.clave,
-    this.isActive = true,
-    required this.rol,
-    required this.institucion,
+    required this._id,
+    required this._nombre,
+    required this._correo,
+    required this._clave,
+    this._isActive = true,
+    required this._rol,
+    required this._institucion,
     
   });
 
+  String get id => _id;
+  String get nombre => _nombre;
+  String get correo => _correo;
+  String get clave => _clave;
+  bool get isActive => _isActive;
+  Rol get rol => _rol;
+  String get institucion => _institucion;
+
+
   Map<String, dynamic> toFirestore() {
     return {
-      'id': id,
-      'nombre': nombre,
-      'correo': correo,
-      'clave': clave,
-      'isActive': isActive,
-      'rol': rol.name,
-      'institucion': institucion,
+      'id': _id,
+      'nombre': _nombre,
+      'correo': _correo,
+      'clave': _clave,
+      'isActive': _isActive,
+      'rol': _rol.name,
+      'institucion': _institucion,
     };
   }
 }

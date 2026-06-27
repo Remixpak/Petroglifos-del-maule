@@ -1,16 +1,19 @@
 import 'package:software_petroglifos/models/archivoMultimedia.dart';
-class imagen extends archivoMultimedia {
-  // Atributos específicos para la clase imagen
-  String url; // URL de la imagen
-  bool isPrincipal; // Indica si esta imagen es la principal del petroglifo
-  imagen({
+class Imagen extends ArchivoMultimedia {
+  String _url; 
+  bool _isPrincipal;
+
+  String get url => _url;
+  bool get isPrincipal => _isPrincipal;
+
+  Imagen({
     required String id,
     required String nombreArchivo,
     required String tipoArchivo,
     required String rutaArchivo,
 
-    required this.url, // Requerimos la URL al crear una instancia de imagen
-    required this.isPrincipal, // Requerimos el indicador de imagen principal
+    required this._url,
+    required this._isPrincipal,
   }) : super(
           id: id,
           nombreArchivo: nombreArchivo,

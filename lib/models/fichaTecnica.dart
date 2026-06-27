@@ -6,20 +6,27 @@ enum TecnicaGrabado { percusion, incision, raspado, mixto }
 enum TipoRoca { basalto, granito, andesita, arenisca, otra }
 
 class FichaTecnica {
-  final String id;
-  final String codigoPetroglifo; // Enlace primario (MAU-XX)
-  final String descripcion;
-  final MotivoPetroglifo motivo;
-  final TecnicaGrabado tecnicaGrabado;
-  final TipoRoca tpoRoca;
+  final String _id;
+  final String _codigoPetroglifo; // Enlace primario (MAU-XX)
+  final String _descripcion;
+  final MotivoPetroglifo _motivo;
+  final TecnicaGrabado _tecnicaGrabado;
+  final TipoRoca _tpoRoca;
+
+  String get id => _id;
+  String get codigoPetroglifo => _codigoPetroglifo;
+  String get descripcion => _descripcion;
+  MotivoPetroglifo get motivo => _motivo;
+  TecnicaGrabado get tecnicaGrabado => _tecnicaGrabado;
+  TipoRoca get tpoRoca => _tpoRoca;
 
   FichaTecnica({
-    required this.id,
-    required this.codigoPetroglifo,
-    required this.descripcion,
-    required this.motivo,
-    required this.tecnicaGrabado,
-    required this.tpoRoca,
+    required this._id,
+    required this._codigoPetroglifo,
+    required this._descripcion,
+    required this._motivo,
+    required this._tecnicaGrabado,
+    required this._tpoRoca,
   });
 
   // Convierte la entidad a un mapa plano listo para Firestore

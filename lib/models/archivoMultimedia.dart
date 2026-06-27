@@ -1,16 +1,20 @@
-class archivoMultimedia {
+class ArchivoMultimedia {
   //revisar atributos ya que no me acuerdo cuales eran
-  String id;
-  String nombreArchivo;
-  String tipoArchivo;
-  String rutaArchivo;//REVISAR ESTO YA QUE NO ME ACUERDO SI ERA NECESARIO
+  String _id;
+  String _nombreArchivo;
+  String _tipoArchivo;
+  String _rutaArchivo;//REVISAR ESTO YA QUE NO ME ACUERDO SI ERA NECESARIO
   //bool visibilidad en bola si se pone
 
-  archivoMultimedia({
-    required this.id,
-    required this.nombreArchivo,
-    required this.tipoArchivo,
-    required this.rutaArchivo,
+  String get id => _id;
+  String get nombreArchivo => _nombreArchivo;
+  String get tipoArchivo => _tipoArchivo;
+  String get rutaArchivo => _tipoArchivo;
+  ArchivoMultimedia({
+    required this._id,
+    required this._nombreArchivo,
+    required this._tipoArchivo,
+    required this._rutaArchivo,
 
   });
 
