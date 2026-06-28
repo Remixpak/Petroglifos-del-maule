@@ -316,6 +316,24 @@ class ControladorGestionArqueologica {
     });
   }
 
+  Future<bool> actualizarSitio({
+    required Sitio sitio,
+}) async {
+
+    try{
+
+       await _dbServicio.actualizarDocumentoGenerico(nombreColeccion: 'sitios', id: sitio.id, datosAActualizar: sitio.toFirestore());
+
+        return true;
+
+    }catch(e){
+
+        print(e);
+
+        return false;
+    }
+}
+
   //==========================================
   //SECCION 3: GESTION DE BITACORAS
   //==========================================
@@ -435,6 +453,24 @@ Future<List<Bitacora>> obtenerBitacorasPorFecha(DateTime fechaLimite) async {
     return null;
   }
 }
+  
+  Future<bool> actualizarBitacora({
+  required Bitacora bitacora,
+}) async {
+  try {
+    await _dbServicio.actualizarDocumentoGenerico(
+      nombreColeccion: 'bitacoras',
+      id: bitacora.id,
+      datosAActualizar: bitacora.toFirestore(),
+    );
+
+    return true;
+  } catch (e) {
+    print('Error al actualizar bitácora: $e');
+    return false;
+  }
+}
+  
   //========================================
   //SECCION 4: REPOETES
   //========================================

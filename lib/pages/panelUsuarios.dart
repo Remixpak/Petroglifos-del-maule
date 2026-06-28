@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // <-- IMPORTANTE: Para saber quién está conectado
+import 'package:firebase_auth/firebase_auth.dart'; 
 import 'package:software_petroglifos/controllers/controladorUsuario.dart'; 
 import 'package:software_petroglifos/models/usuario.dart'; 
 import 'package:software_petroglifos/pages/formularioRegistro.dart';
@@ -22,6 +22,19 @@ class _PanelUsuariosState extends State<PanelUsuarios> {
       ),
     );
   }
+
+  void _editarUsuario(Usuario usuario) {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => FormularioRegistro(
+        "",
+        tipo: TipoRegistro.usuario,
+        usuarioEditar: usuario,
+      ),
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {
@@ -104,89 +117,116 @@ class _PanelUsuariosState extends State<PanelUsuarios> {
                             
                             children: [
                               Padding(
-                                padding: const EdgeInsets.all(16.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Divider(),
-                                    const SizedBox(height: 4),
-                                    Text('Correo Institucional: ${usuarioLista.correo}'),
-                                    const SizedBox(height: 6),
-                                    Text('Institución: ${usuarioLista.institucion.isNotEmpty ? usuarioLista.institucion : "No especificada"}'),
-                                    const SizedBox(height: 12),
-                                    
-                                    // ====================================================================
-                                    // AHORA SÍ: Condicional basado en el usuario OPERADOR del sistema
-                                    // ====================================================================
-                                    if (esUsuarioActualAdmin) ...[
-                                      Container(
-                                        decoration: BoxDecoration(
-                                          color: cuentaActiva 
-                                              ? Colors.green.withOpacity(0.08) 
-                                              : Colors.red.withOpacity(0.08),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: SwitchListTile(
-                                          activeColor: Colors.green,
-                                          inactiveTrackColor: Colors.red.withOpacity(0.2),
-                                          inactiveThumbColor: Colors.red,
-                                          title: Text(
-                                            cuentaActiva ? 'Cuenta Activa' : 'Cuenta Desactivada (Sin Acceso)',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              color: cuentaActiva ? Colors.green : Colors.red,
-                                            ),
-                                          ),
-                                          subtitle: Text('Permitir acceso a ${usuarioLista.nombre} al software.'),
-                                          value: cuentaActiva,
-                                          onChanged: (bool nuevoEstado) {
-                                            setStateLocal(() {
-                                              cuentaActiva = nuevoEstado;
-                                            });
+  padding: const EdgeInsets.all(16.0),
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Divider(),
+      const SizedBox(height: 4),
+      Text('Correo Institucional: ${usuarioLista.correo}'),
+      const SizedBox(height: 6),
+      Text(
+        'Institución: ${usuarioLista.institucion.isNotEmpty ? usuarioLista.institucion : "No especificada"}',
+      ),
+      const SizedBox(height: 12),
 
-                                            ScaffoldMessenger.of(context).clearSnackBars();
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              SnackBar(
-                                                behavior: SnackBarBehavior.floating,
-                                                content: Text(
-                                                  nuevoEstado
-                                                      ? 'Activando cuenta de: ${usuarioLista.nombre}'
-                                                      : 'Desactivando cuenta de: ${usuarioLista.nombre}',
-                                                ),
-                                                action: SnackBarAction(
-                                                  label: 'OK',
-                                                  onPressed: () {},
-                                                ),
-                                              ),
-                                            );
+      if (esUsuarioActualAdmin) ...[
+        Container(
+          decoration: BoxDecoration(
+            color: cuentaActiva
+                ? Colors.green.withOpacity(0.08)
+                : Colors.red.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: SwitchListTile(
+            activeColor: Colors.green,
+            inactiveTrackColor: Colors.red.withOpacity(0.2),
+            inactiveThumbColor: Colors.red,
+            title: Text(
+              cuentaActiva
+                  ? 'Cuenta Activa'
+                  : 'Cuenta Desactivada (Sin Acceso)',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: cuentaActiva ? Colors.green : Colors.red,
+              ),
+            ),
+            subtitle: Text(
+              'Permitir acceso a ${usuarioLista.nombre} al software.',
+            ),
+            value: cuentaActiva,
+            onChanged: (bool nuevoEstado) {
+              setStateLocal(() {
+                cuentaActiva = nuevoEstado;
+              });
 
-                                             _controladorUsuario.cambiarEstadoCuenta(usuarioLista.id, nuevoEstado);
-                                          },
-                                        ),
-                                      ),
-                                    ] else ...[
-                                      // Si no es admin, solo ve el estatus en texto plano sin poder mover nada
-                                      Row(
-                                        children: [
-                                          Icon(
-                                            cuentaActiva ? Icons.check_circle_outline_rounded : Icons.remove_circle_outline_rounded,
-                                            color: cuentaActiva ? Colors.green : Colors.grey,
-                                            size: 20,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            cuentaActiva ? 'Estado de cuenta: Activa' : 'Estado de cuenta: Inactiva',
-                                            style: TextStyle(
-                                              fontStyle: FontStyle.italic,
-                                              color: cuentaActiva ? Colors.green.shade700 : Colors.grey,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              )
+              ScaffoldMessenger.of(context).clearSnackBars();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  behavior: SnackBarBehavior.floating,
+                  content: Text(
+                    nuevoEstado
+                        ? 'Activando cuenta de: ${usuarioLista.nombre}'
+                        : 'Desactivando cuenta de: ${usuarioLista.nombre}',
+                  ),
+                  action: SnackBarAction(
+                    label: 'OK',
+                    onPressed: () {},
+                  ),
+                ),
+              );
+
+              _controladorUsuario.cambiarEstadoCuenta(
+                usuarioLista.id,
+                nuevoEstado,
+              );
+            },
+          ),
+        ),
+      ] else ...[
+        Row(
+          children: [
+            Icon(
+              cuentaActiva
+                  ? Icons.check_circle_outline_rounded
+                  : Icons.remove_circle_outline_rounded,
+              color: cuentaActiva ? Colors.green : Colors.grey,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              cuentaActiva
+                  ? 'Estado de cuenta: Activa'
+                  : 'Estado de cuenta: Inactiva',
+              style: TextStyle(
+                fontStyle: FontStyle.italic,
+                color: cuentaActiva
+                    ? Colors.green.shade700
+                    : Colors.grey,
+              ),
+            ),
+          ],
+        ),
+      ],
+
+      const SizedBox(height: 20),
+
+      if (esUsuarioActualAdmin)
+        Align(
+          alignment: Alignment.centerRight,
+          child: ElevatedButton.icon(
+            onPressed: () => _editarUsuario(usuarioLista),
+            icon: const Icon(Icons.edit),
+            label: const Text("Editar Usuario"),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ),
+    ],
+  ),
+),
                             ],
                           );
                         },

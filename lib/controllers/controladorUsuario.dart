@@ -148,4 +148,16 @@ class ControladorUsuario {
       print('Error al cambiar el estado de la cuenta del usuario $idUsuario: $e');
     }
   }
+  
+  Future<bool> actualizarUsuario({
+    required Usuario usuario,
+  }) async {
+    try{
+      await _dbServicio.actualizarDocumentoGenerico(nombreColeccion: 'usuarios', id: usuario.id, datosAActualizar: usuario.toFirestore());
+      return true;
+    } catch (e){
+      print('error al actualizar usuario: $e');
+      return false;
+    }
+  }
 }

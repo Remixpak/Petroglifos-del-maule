@@ -20,6 +20,18 @@ class _PantallaListarSitiosState extends State<PantallaListarSitios> {
       MaterialPageRoute(builder: (context) => const FormularioRegistro("Sitio", tipo: TipoRegistro.sitio)),
     );
   }
+  void _editarSitio(Sitio sitio) {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => FormularioRegistro(
+        "",
+        tipo: TipoRegistro.sitio,
+        sitioEditar: sitio,
+      ),
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {
@@ -137,6 +149,20 @@ class _PantallaListarSitiosState extends State<PantallaListarSitios> {
                                       );
                                     }).toList(),
                                   ),
+                                  const SizedBox(height: 20),
+
+Align(
+  alignment: Alignment.centerRight,
+  child: ElevatedButton.icon(
+    icon: const Icon(Icons.edit),
+    label: const Text("Editar Sitio"),
+    style: ElevatedButton.styleFrom(
+      backgroundColor: Colors.orange,
+      foregroundColor: Colors.white,
+    ),
+    onPressed: () => _editarSitio(sitio),
+  ),
+),
                           ],
                         ),
                       )

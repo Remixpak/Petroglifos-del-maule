@@ -12,6 +12,7 @@ import 'package:file_selector_platform_interface/file_selector_platform_interfac
 import 'package:software_petroglifos/controllers/controladorGestionArqueologica.dart';
 import 'package:software_petroglifos/controllers/controladorUsuario.dart';
 import 'package:software_petroglifos/controllers/controladorSugerencias.dart';
+import 'package:software_petroglifos/models/bitacora.dart';
 import 'package:software_petroglifos/models/fichaTecnica.dart';
 import 'package:software_petroglifos/models/sitio.dart';
 import 'package:software_petroglifos/models/usuario.dart';
@@ -32,7 +33,20 @@ enum TipoRegistro {
 class FormularioRegistro extends StatefulWidget {
   final TipoRegistro tipo;
 
-  const FormularioRegistro(String s, {super.key, required this.tipo});
+  final Sitio? sitioEditar;
+  final Bitacora? bitacoraEditar;
+  final Usuario? usuarioEditar;
+  
+
+  const FormularioRegistro(
+    String s,{
+    super.key,
+    required this.tipo,
+    this.sitioEditar,
+    this.bitacoraEditar,
+    this.usuarioEditar
+  });
+
 
   @override
   State<FormularioRegistro> createState() => _FormularioRegistroState();
@@ -104,15 +118,33 @@ class _FormularioRegistroState extends State<FormularioRegistro> {
   //================================================================
   final _descripcionSugerenciaController = TextEditingController();
   final _controladorSugerencia = Controladorsugerencias();
+  
+  bool get _modoEdicionSitio => widget.sitioEditar != null;
+
+  bool get _modoEdicionBitacora => widget.bitacoraEditar != null;
 
   @override
-  void initState() {
-    super.initState();
-    _verificarSiEsAdmin();
-    if (widget.tipo == TipoRegistro.petroglifo) {
+void initState() {
+  super.initState();
+
+  _verificarSiEsAdmin();
+
+  if(widget.tipo == TipoRegistro.petroglifo){
       _sitiosStream = _controladorNegocio.listarSitios();
-    }
   }
+
+  if(widget.sitioEditar != null){
+      _cargarSitio(widget.sitioEditar!);
+  }
+
+  if(widget.bitacoraEditar != null){
+      _cargarBitacora(widget.bitacoraEditar!);
+  }
+
+  if (widget.usuarioEditar != null) {
+  _cargarUsuario(widget.usuarioEditar!);
+}
+}
 
 
   @override
@@ -294,6 +326,71 @@ class _FormularioRegistroState extends State<FormularioRegistro> {
     }
   }
 
+  void _cargarSitio(Sitio sitio){
+
+    _nombreSitioController.text = sitio.nombre;
+
+    _codigoSitioController.text = sitio.codigoInterno;
+
+    _comunaSitioController.text = sitio.comuna;
+
+    _descripcionSitioController.text = sitio.descripcion;
+
+    _accesoSeleccionado = sitio.estadoAcceso;
+
+    _latitud = sitio.latitud;
+
+    _longitud = sitio.longitud;
+}
+
+  Future<void> _procesarEdicionSitio() async {
+
+    Sitio sitioActualizado = Sitio(
+
+        id: widget.sitioEditar!.id,
+
+        nombre: _nombreSitioController.text,
+
+        codigoInterno: _codigoSitioController.text,
+
+        comuna: _comunaSitioController.text,
+
+        descripcion: _descripcionSitioController.text,
+
+        estadoAcceso: _accesoSeleccionado,
+
+        latitud: _latitud!,
+
+        longitud: _longitud!,
+
+        petroglifosIds: widget.sitioEditar!.petroglifosIds,
+    );
+
+    bool exito =
+        await _controladorNegocio.actualizarSitio(
+            sitio: sitioActualizado,
+        );
+        if (!mounted) return;
+
+if (exito) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text('Sitio actualizado correctamente.'),
+      backgroundColor: Colors.green,
+    ),
+  );
+
+  Navigator.pop(context);
+} else {
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text('Ocurrió un error al actualizar el sitio.'),
+      backgroundColor: Colors.red,
+    ),
+  );
+}
+}
+
   //=========================================================================
   //funciones de usuario
   //=========================================================================
@@ -405,7 +502,7 @@ class _FormularioRegistroState extends State<FormularioRegistro> {
   }
 }
 
-Future<void> _verificarSiEsAdmin() async {
+  Future<void> _verificarSiEsAdmin() async {
   try {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -448,6 +545,66 @@ Future<void> _verificarSiEsAdmin() async {
     if (mounted) {
       setState(() => _cargandoRol = false);
     }
+  }
+}
+
+  void _cargarUsuario(Usuario usuario) {
+
+  _nombreController.text = usuario.nombre;
+
+  _emailController.text = usuario.correo;
+
+  _passwordController.text = usuario.clave;
+
+  _institucionController.text = usuario.institucion;
+
+  _rolSeleccionado = usuario.rol;
+}
+
+  Future<void> _procesarEdicionUsuario() async {
+
+  final usuarioActualizado = Usuario(
+    id: widget.usuarioEditar!.id,
+
+    nombre: _nombreController.text.trim(),
+
+    correo: _emailController.text.trim(),
+
+    clave:  _passwordController.text.trim(),
+
+    institucion: _institucionController.text.trim(),
+
+    rol: _rolSeleccionado,
+
+    // cualquier otro atributo que ya tenga tu modelo
+  );
+
+  final exito = await _controladorUsuario.actualizarUsuario(
+    usuario: usuarioActualizado,
+  );
+
+  if (!mounted) return;
+
+  if (exito) {
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Usuario actualizado correctamente.'),
+        backgroundColor: Colors.green,
+      ),
+    );
+
+    Navigator.pop(context);
+
+  } else {
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Ocurrió un error al actualizar el usuario.'),
+        backgroundColor: Colors.red,
+      ),
+    );
+
   }
 }
 
@@ -536,6 +693,61 @@ Future<void> _verificarSiEsAdmin() async {
   }
 }
 
+  Future<void> _procesarEdicionBitacora() async {
+  
+  final List<String> participantesActualizados = _participantesBitacora
+      .where((id) => id != null)
+      .cast<String>()
+      .toList();
+
+  final bitacoraActualizada = Bitacora(
+    id: widget.bitacoraEditar!.id,
+    fechaInicio: _fechaInicioBitacora!,
+    fechaFin: _fechaFinBitacora!,
+    actividad: _actividadBitacoraController.text.trim(),
+    observaciones: _observacionesBitacoraController.text.trim(),
+    idParticipantes: participantesActualizados,
+  );
+
+  final exito = await _controladorNegocio.actualizarBitacora(
+    bitacora: bitacoraActualizada,
+  );
+
+  if (!mounted) return;
+
+  if (exito) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Bitácora actualizada correctamente.'),
+        backgroundColor: Colors.green,
+      ),
+    );
+
+    Navigator.pop(context);
+  } else {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Ocurrió un error al actualizar la bitácora.'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+}
+  void _cargarBitacora(Bitacora bitacora){
+
+    _fechaInicioBitacora = bitacora.fechaInicio;
+
+    _fechaFinBitacora = bitacora.fechaFin;
+
+    _actividadBitacoraController.text =
+        bitacora.actividad;
+
+    _observacionesBitacoraController.text =
+        bitacora.observaciones;
+
+    _participantesBitacora =
+        List<String?>.from(bitacora.idParticipantes);
+}
   //=========================================================================
   //funciones de reporte
   //=========================================================================
@@ -858,7 +1070,9 @@ Future<void> _verificarSiEsAdmin() async {
               ? const Center(child: CircularProgressIndicator())
               : ElevatedButton(
                   style: ElevatedButton.styleFrom(padding: const EdgeInsets.all(16)),
-                  onPressed: _procesarGuardadoSitio,
+                  onPressed: _modoEdicionSitio
+                      ? _procesarEdicionSitio
+                      : _procesarGuardadoSitio,
                   child: const Text('Guardar Sitio Arqueológico', style: TextStyle(fontSize: 16)),
                 ),
         ],
@@ -972,7 +1186,7 @@ Future<void> _verificarSiEsAdmin() async {
                       backgroundColor: Colors.teal, 
                       foregroundColor: Colors.white
                     ),
-                    onPressed: _procesarGuardadoBitacora,
+                    onPressed: _modoEdicionBitacora? _procesarEdicionBitacora: _procesarGuardadoBitacora,
                     child: const Text('Guardar Bitácora', style: TextStyle(fontSize: 16)),
                   ),
           ],
@@ -1027,7 +1241,8 @@ Future<void> _verificarSiEsAdmin() async {
                   foregroundColor: Colors.white,
                 ),
                 icon: const Icon(Icons.assignment_turned_in_rounded),
-                onPressed: _procesarGuardadoReporteTecnico,
+                onPressed: 
+                 _procesarGuardadoReporteTecnico,
                 label: const Text('Compilar y Registrar Reporte', style: TextStyle(fontSize: 16)),
               ),
       ],
@@ -1176,7 +1391,7 @@ Future<void> _verificarSiEsAdmin() async {
                 foregroundColor: Colors.white,
               ),
               icon: Icon(_esLogin ? Icons.login_rounded : Icons.person_add_alt_1_rounded),
-              onPressed: _procesarAutenticacion,
+              onPressed: widget.usuarioEditar != null? _procesarEdicionUsuario: _procesarGuardadoUsuario,
               label: Text(_esLogin ? 'Iniciar Sesión' : 'Registrar Investigador', style: const TextStyle(fontSize: 16)),
             ),
 

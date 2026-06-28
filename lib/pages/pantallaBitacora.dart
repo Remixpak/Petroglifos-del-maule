@@ -19,6 +19,18 @@ class _PantallaListarBitacorasState extends State<PantallaListarBitacoras> {
       MaterialPageRoute(builder: (context) => const FormularioRegistro("Bitácora", tipo: TipoRegistro.bitacora)),
     );
   }
+  void _editarBitacora(Bitacora bitacora) {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => FormularioRegistro(
+        "",
+        tipo: TipoRegistro.bitacora,
+        bitacoraEditar: bitacora,
+      ),
+    ),
+  );
+}
 
   // Helper para formatear la fecha y hora de manera legible (Ej: 24/06/2026 14:30)
   String _formatearFecha(DateTime fecha) {
@@ -146,6 +158,20 @@ class _PantallaListarBitacorasState extends State<PantallaListarBitacoras> {
                                       );
                                     }).toList(),
                                   ),
+                                  const SizedBox(height: 20),
+
+Align(
+  alignment: Alignment.centerRight,
+  child: ElevatedButton.icon(
+    onPressed: () => _editarBitacora(bitacora),
+    icon: const Icon(Icons.edit),
+    label: const Text("Editar Bitácora"),
+    style: ElevatedButton.styleFrom(
+      backgroundColor: Colors.orange,
+      foregroundColor: Colors.white,
+    ),
+  ),
+),
                           ],
                         ),
                       )
