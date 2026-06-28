@@ -255,6 +255,54 @@ class ControladorGestionArqueologica {
       return null;
     }
   }
+  
+  Future<List<Petroglifo>> buscarPetroglifosPorNombre(String nombre) async {
+  try {
+    final snapshot = await _dbServicio.obtenerDocumentosPorFiltro(
+      nombreColeccion: 'petroglifos',
+      campo: 'nombre',
+      operacion: 'isEqualTo',
+      valor: nombre.trim(),
+    );
+
+    return snapshot.docs.map((doc) {
+      final data = doc.data();
+
+      final List<dynamic> imgsData = data['imagenes'] ?? [];
+      final List<Imagen> listaImagenes = imgsData.map((img) {
+        return Imagen(
+          id: img['id'] ?? '',
+          nombreArchivo: img['nombreArchivo'] ?? '',
+          tipoArchivo: img['tipoArchivo'] ?? '',
+          rutaArchivo: img['rutaArchivo'] ?? '',
+          url: img['base64Data'] ?? img['url'] ?? '',
+          isPrincipal: img['isPrincipal'] ?? false,
+        );
+      }).toList();
+
+      final List<dynamic> arcData = data['archivosMultimedia'] ?? [];
+      final List<ArchivoMultimedia> listaArchivos = arcData.map((arc) {
+        return ArchivoMultimedia(
+          id: arc['id'] ?? '',
+          nombreArchivo: arc['nombreArchivo'] ?? '',
+          tipoArchivo: arc['tipoArchivo'] ?? '',
+          rutaArchivo: arc['rutaArchivo'] ?? '',
+        );
+      }).toList();
+
+      return Petroglifo(
+        id: data['id'] ?? doc.id,
+        nombre: data['nombre'] ?? '',
+        imagenes: listaImagenes,
+        archivosMultimedia: listaArchivos,
+      );
+    }).toList();
+  } catch (e) {
+    print("Error buscando petroglifos: $e");
+    return [];
+  }
+}
+  
   // ==========================================
   // SECCIÓN 2: GESTIÓN DE SITIOS ARQUEOLÓGICOS
   // ==========================================
@@ -332,6 +380,41 @@ class ControladorGestionArqueologica {
 
         return false;
     }
+}
+
+  Future<List<Sitio>> buscarSitiosPorCodigoInterno(String codigo) async {
+  try {
+    final snapshot = await _dbServicio.obtenerDocumentosPorFiltro(
+      nombreColeccion: 'sitios',
+      campo: 'codigoInterno',
+      operacion: 'isEqualTo',
+      valor: codigo.trim(),
+    );
+
+    return snapshot.docs.map((doc) {
+      final data = doc.data();
+
+      final estadoEnum = EstadoAcceso.values.firstWhere(
+        (e) => e.name == data['estadoAcceso'],
+        orElse: () => EstadoAcceso.publico,
+      );
+
+      return Sitio(
+        id: data['id'] ?? doc.id,
+        nombre: data['nombre'] ?? '',
+        codigoInterno: data['codigoInterno'] ?? '',
+        comuna: data['comuna'] ?? '',
+        descripcion: data['descripcion'] ?? '',
+        estadoAcceso: estadoEnum,
+        latitud: (data['latitud'] as num?)?.toDouble() ?? 0.0,
+        longitud: (data['longitud'] as num?)?.toDouble() ?? 0.0,
+        petroglifosIds: List<String>.from(data['petroglifosIds'] ?? []),
+      );
+    }).toList();
+  } catch (e) {
+    print('Error al buscar sitio por código interno: $e');
+    return [];
+  }
 }
 
   //==========================================

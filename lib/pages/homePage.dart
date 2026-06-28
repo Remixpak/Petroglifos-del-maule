@@ -24,7 +24,9 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   final ControladorGestionArqueologica _controlador = ControladorGestionArqueologica();
   final ControladorUsuario _controladorUsuario = ControladorUsuario(); // <-- Instanciado para validar cuenta activa
-  
+  final TextEditingController _busquedaController = TextEditingController();
+
+  List<Petroglifo>? _resultadoBusqueda;
   int _indiceActual = 0;
 
   void _irAPanelUsuario() {
@@ -86,6 +88,30 @@ class _MyHomePageState extends State<MyHomePage> {
       );
     }
   }
+  Future<void> _buscarPetroglifo() async {
+  if (_busquedaController.text.trim().isEmpty) {
+    setState(() {
+      _resultadoBusqueda = null;
+    });
+    return;
+  }
+
+  final resultado = await _controlador.buscarPetroglifosPorNombre(
+    _busquedaController.text,
+  );
+
+  setState(() {
+    _resultadoBusqueda = resultado;
+  });
+}
+
+void _limpiarBusqueda() {
+  _busquedaController.clear();
+
+  setState(() {
+    _resultadoBusqueda = null;
+  });
+}
 
   @override
   Widget build(BuildContext context) {
@@ -134,111 +160,143 @@ class _MyHomePageState extends State<MyHomePage> {
                 ],
               ),
               
-              body: StreamBuilder<List<Petroglifo>>(
-                stream: _controlador.listarPetroglifos(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-
-                  if (snapshot.hasError) {
-                    return Center(child: Text('Error al cargar petroglifos: ${snapshot.error}'));
-                  }
-
-                  final petroglifos = snapshot.data ?? [];
-
-                  if (petroglifos.isEmpty) {
-                    return const Center(
-                      child: Text(
-                        'No hay registros',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                    );
-                  }
-
-                  return Padding(
-                    padding: const EdgeInsets.all(12.0),
-                    child: GridView.builder(
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: crossAxisCount,
-                        crossAxisSpacing: 12.0,
-                        mainAxisSpacing: 12.0,
-                        childAspectRatio: 0.85, 
-                      ),
-                      itemCount: petroglifos.length,
-                      itemBuilder: (context, index) {
-                        final petroglifo = petroglifos[index];
-                        String imageUrl = '';
-                        bool esBase64 = false;
-                        
-                        try {
-                          final imgPrincipal = petroglifo.obtenerImagenPrincipal();
-                          imageUrl = imgPrincipal.url; 
-                          esBase64 = !imageUrl.startsWith('http');
-                        } catch (e) {
-                          imageUrl = ''; 
+              body: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _busquedaController,
+                            decoration: const InputDecoration(
+                              labelText: "Buscar petroglifo",
+                              prefixIcon: Icon(Icons.search),
+                              border: OutlineInputBorder(),
+                            ),
+                            onSubmitted: (_) => _buscarPetroglifo(),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: const Icon(Icons.search),
+                          onPressed: _buscarPetroglifo,
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: _limpiarBusqueda,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: StreamBuilder<List<Petroglifo>>(
+                      stream: _controlador.listarPetroglifos(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(child: CircularProgressIndicator());
                         }
 
-                        return Card(
-                          elevation: 4,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(12),
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => DetallePetroglifo(petroglifo: petroglifo),
+                        if (snapshot.hasError) {
+                          return Center(child: Text('Error al cargar petroglifos: ${snapshot.error}'));
+                        }
+
+                        final petroglifos = _resultadoBusqueda ?? (snapshot.data ?? []);
+
+                        if (petroglifos.isEmpty) {
+                          return const Center(
+                            child: Text(
+                              'No hay registros',
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            ),
+                          );
+                        }
+
+                        return Padding(
+                          padding: const EdgeInsets.all(12.0),
+                          child: GridView.builder(
+                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: crossAxisCount,
+                              crossAxisSpacing: 12.0,
+                              mainAxisSpacing: 12.0,
+                              childAspectRatio: 0.85,
+                            ),
+                            itemCount: petroglifos.length,
+                            itemBuilder: (context, index) {
+                              final petroglifo = petroglifos[index];
+                              String imageUrl = '';
+                              bool esBase64 = false;
+
+                              try {
+                                final imgPrincipal = petroglifo.obtenerImagenPrincipal();
+                                imageUrl = imgPrincipal.url;
+                                esBase64 = !imageUrl.startsWith('http');
+                              } catch (e) {
+                                imageUrl = '';
+                              }
+
+                              return Card(
+                                elevation: 4,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(12),
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => DetallePetroglifo(petroglifo: petroglifo),
+                                      ),
+                                    );
+                                  },
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    children: [
+                                      Expanded(
+                                        child: ClipRRect(
+                                          borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                                          child: imageUrl.isNotEmpty
+                                              ? (esBase64
+                                                  ? Image.memory(
+                                                      base64Decode(imageUrl),
+                                                      fit: BoxFit.cover,
+                                                      errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, size: 50),
+                                                    )
+                                                  : Image.network(
+                                                      imageUrl,
+                                                      fit: BoxFit.cover,
+                                                      errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, size: 50),
+                                                    ))
+                                              : const Icon(Icons.image_not_supported, size: 50),
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.all(12.0),
+                                        key: ValueKey(petroglifo.id),
+                                        child: Text(
+                                          petroglifo.nombre,
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               );
                             },
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Expanded(
-                                  child: ClipRRect(
-                                    borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                                    child: imageUrl.isNotEmpty
-                                        ? (esBase64 
-                                            ? Image.memory(
-                                                base64Decode(imageUrl),
-                                                fit: BoxFit.cover,
-                                                errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, size: 50),
-                                              )
-                                            : Image.network(
-                                                imageUrl,
-                                                fit: BoxFit.cover,
-                                                errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, size: 50),
-                                              ))
-                                        : const Icon(Icons.image_not_supported, size: 50),
-                                  ),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.all(12.0),
-                                  key: ValueKey(petroglifo.id),
-                                  child: Text(
-                                    petroglifo.nombre,
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
                           ),
                         );
                       },
                     ),
-                  );
-                },
+                  ),
+                ],
               ),
-              
               bottomNavigationBar: NavigationBar(
                 selectedIndex: _indiceActual,
                 onDestinationSelected: (int index) {

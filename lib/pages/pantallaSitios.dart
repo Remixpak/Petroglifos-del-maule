@@ -13,7 +13,9 @@ class PantallaListarSitios extends StatefulWidget {
 
 class _PantallaListarSitiosState extends State<PantallaListarSitios> {
   final _controlador = ControladorGestionArqueologica();
+  final TextEditingController _busquedaController = TextEditingController();
 
+  List<Sitio>? _resultadoBusqueda;
   void _irARegistroSitio() {
     Navigator.push(
       context,
@@ -28,9 +30,33 @@ class _PantallaListarSitiosState extends State<PantallaListarSitios> {
         "",
         tipo: TipoRegistro.sitio,
         sitioEditar: sitio,
+        ),
       ),
-    ),
+    );
+  }
+
+  Future<void> _buscarSitio() async {
+  if (_busquedaController.text.trim().isEmpty) {
+    setState(() {
+      _resultadoBusqueda = null;
+    });
+    return;
+  }
+
+  final resultado = await _controlador.buscarSitiosPorCodigoInterno(
+    _busquedaController.text,
   );
+
+  setState(() {
+    _resultadoBusqueda = resultado;
+  });
+}
+void _limpiarBusqueda() {
+  _busquedaController.clear();
+
+  setState(() {
+    _resultadoBusqueda = null;
+  });
 }
 
   @override
@@ -43,7 +69,43 @@ class _PantallaListarSitiosState extends State<PantallaListarSitios> {
       appBar: AppBar(
         title: const Text('Sitios Arqueológicos'),
       ),
-      body: StreamBuilder<List<Sitio>>(
+      body: Column(
+  children: [
+
+    Padding(
+      padding: const EdgeInsets.all(12),
+      child: Row(
+        children: [
+
+          Expanded(
+            child: TextField(
+              controller: _busquedaController,
+              decoration: const InputDecoration(
+                labelText: 'Buscar por código interno',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.search),
+              ),
+              onSubmitted: (_) => _buscarSitio(),
+            ),
+          ),
+
+          const SizedBox(width: 8),
+
+          IconButton(
+            onPressed: _buscarSitio,
+            icon: const Icon(Icons.search),
+          ),
+
+          IconButton(
+            onPressed: _limpiarBusqueda,
+            icon: const Icon(Icons.clear),
+          ),
+        ],
+      ),
+    ),
+
+    Expanded(
+      child: StreamBuilder<List<Sitio>>(
         stream: _controlador.listarSitios(), // Escucha la BD en tiempo real
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -54,16 +116,21 @@ class _PantallaListarSitiosState extends State<PantallaListarSitios> {
             return Center(child: Text('Error al cargar sitios: ${snapshot.error}'));
           }
 
-          final sitios = snapshot.data ?? [];
+          final sitios = _resultadoBusqueda ?? (snapshot.data ?? []);
 
           if (sitios.isEmpty) {
-            return const Center(
-              child: Text(
-                'No hay sitios registrados',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-            );
-          }
+  return Center(
+    child: Text(
+      _resultadoBusqueda != null
+          ? 'No se encontró ningún sitio con ese código.'
+          : 'No hay sitios registrados',
+      style: const TextStyle(
+        fontSize: 18,
+        fontWeight: FontWeight.bold,
+      ),
+    ),
+  );
+}
 
           return ListView.builder(
   padding: EdgeInsets.symmetric(horizontal: paddingHorizontal, vertical: 12.0),
@@ -174,7 +241,9 @@ Align(
           );
         },
       ),
-
+    ),
+  ],
+      ),
       // BOTÓN FLOTANTE EN LA ESQUINA INFERIOR DERECHA
       floatingActionButton: FloatingActionButton(
         onPressed: _irARegistroSitio,
