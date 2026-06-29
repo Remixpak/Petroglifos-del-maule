@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:software_petroglifos/controllers/controladorGestionArqueologica.dart';
 import 'package:software_petroglifos/models/sitio.dart';
-import 'package:software_petroglifos/pages/formularioSitios.dart';
 import 'package:software_petroglifos/pages/formularioRegistro.dart';
 
 class PantallaListarSitios extends StatefulWidget {
@@ -61,7 +60,7 @@ void _limpiarBusqueda() {
 
   @override
   Widget build(BuildContext context) {
-    // Ajuste de padding para que en PC no se pegue totalmente a los bordes del monitor
+    
     final double width = MediaQuery.of(context).size.width;
     final double paddingHorizontal = width > 800 ? width * 0.15 : 12.0;
 
@@ -106,7 +105,7 @@ void _limpiarBusqueda() {
 
     Expanded(
       child: StreamBuilder<List<Sitio>>(
-        stream: _controlador.listarSitios(), // Escucha la BD en tiempo real
+        stream: _controlador.listarSitios(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -138,7 +137,7 @@ void _limpiarBusqueda() {
   itemBuilder: (context, index) { 
     final sitio = sitios[index];
               
-              // Verificamos si las coordenadas deben protegerse
+             
               final bool esPrivado = sitio.estadoAcceso == EstadoAcceso.privado;
 
               return Card(
@@ -173,7 +172,7 @@ void _limpiarBusqueda() {
                             Text('Acceso: ${sitio.estadoAcceso.name}'),
                             const SizedBox(height: 6),
                             
-                            // Muestra las coordenadas solo si el acceso NO es privado
+                            
                             if (!esPrivado) ...[
                               Text('Coordenadas GPS: ${sitio.latitud}, ${sitio.longitud}'),
                             ] else ...[
@@ -185,14 +184,14 @@ void _limpiarBusqueda() {
                             
                             const SizedBox(height: 14),
                             
-                            // SUB-LISTA DE PETROGLIFOS ASOCIADOS
+                           
                             const Text(
                               'Petroglifos Asociados:',
                               style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey),
                             ),
                             const SizedBox(height: 6),
                             
-                            //  MODIFICADO: Ahora evalúa 'sitio.petroglifosIds' en lugar del viejo 'sitio.petroglifos'
+                            
                             sitio.petroglifosIds.isEmpty
                                 ? const Padding(
                                     padding: EdgeInsets.only(left: 8.0, top: 4.0),
@@ -200,7 +199,7 @@ void _limpiarBusqueda() {
                                   )
                                 : Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
-                                    //  MODIFICADO: Mapea la lista de IDs (Strings) directamente
+                                    
                                     children: sitio.petroglifosIds.map((idPetroglifo) {
                                       return Padding(
                                         padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
@@ -208,8 +207,7 @@ void _limpiarBusqueda() {
                                           children: [
                                             const Icon(Icons.blur_on_rounded, size: 16, color: Colors.orange),
                                             const SizedBox(width: 8),
-                                            // Como solo tenemos el ID guardado en la relación del Sitio, 
-                                            // mostramos el ID o un texto identificador corto por ahora.
+                                            
                                             Text('ID Petroglifo: $idPetroglifo', style: const TextStyle(fontSize: 14)),
                                           ],
                                         ),
@@ -244,7 +242,6 @@ Align(
     ),
   ],
       ),
-      // BOTÓN FLOTANTE EN LA ESQUINA INFERIOR DERECHA
       floatingActionButton: FloatingActionButton(
         onPressed: _irARegistroSitio,
         tooltip: 'Registrar Nuevo Sitio',

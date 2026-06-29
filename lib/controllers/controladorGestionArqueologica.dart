@@ -7,17 +7,31 @@ import 'package:software_petroglifos/models/archivoMultimedia.dart';
 import 'package:software_petroglifos/models/imagen.dart'; 
 import 'package:software_petroglifos/models/petroglifo.dart';
 import 'package:software_petroglifos/models/sitio.dart';
-import 'package:software_petroglifos/controllers/firestoreService.dart';
+import 'package:software_petroglifos/controllers/ConexionFirestore.dart';
 import 'package:software_petroglifos/models/bitacora.dart';
 import 'package:software_petroglifos/models/reporteTecnico.dart';
 
+/*
+Este archivo tiene todas las funciones que se requieren para manejar 
+cualquier cosa relacionada a los petroglifos, es la comunicacion con
+el formulario de registro y los modelos (los que aplican en este contexto sipo)
+tambien se conecta con la fachada pa guardar en la base de datos
+
+*/
+/*
+Las funciones de registro, listado, actualizacion y busqueda hacen practicamente
+lo mismo, asi que si no esta comentado buscar la funcion que si lo este para entender 
+el funcionamiento y eso es basicamente la misma logica
+*/
+
 class ControladorGestionArqueologica {
-  final FirestoreService _dbServicio = FirestoreService();
+  final ConexionFirestore _dbServicio = ConexionFirestore();
   final _uuid = const Uuid();
 
-  // =========================================================================
-  // ALGORITMO: TRANSFORMACIÓN DE RONALD (Implementado en la Capa de Negocio)
-  // =========================================================================
+  /*
+    esta funcion procesa las imagenes de los petroglifos seleccionados y los transforma
+    a cadenas de texto en formato Base64 pa guardar en firestore (ni ahi con pagar 300k)
+  */
   Future<Map<String, String>> transformacionDeRonald({
     required List<PlatformFile> fotosVisualizables, 
     required List<Imagen> imagenes
@@ -27,7 +41,6 @@ class ControladorGestionArqueologica {
     for (int i = 0; i < fotosVisualizables.length; i++) {
       String base64String = '';
       
-      // Intentamos leer preferentemente desde memoria (bytes crudos) para evitar bloqueos del SO móvil
       if (fotosVisualizables[i].bytes != null) {
         base64String = base64Encode(fotosVisualizables[i].bytes!);
       } else if (fotosVisualizables[i].path != null && fotosVisualizables[i].path!.isNotEmpty) {
@@ -36,7 +49,6 @@ class ControladorGestionArqueologica {
         base64String = base64Encode(imageBytes);
       }
       
-      // Vinculamos la cadena generada con el ID correspondiente que tendrá el modelo
       if (i < imagenes.length) {
         resultadoBase64[imagenes[i].id] = base64String;
       }
@@ -44,9 +56,16 @@ class ControladorGestionArqueologica {
     return resultadoBase64;
   }
 
-  // ==========================================
-  // SECCIÓN 1: GESTIÓN DE PETROGLIFOS
-  // ==========================================
+  //==========================================
+  //PETROGLIFOS
+  //==========================================
+  
+  /*
+    esta funci0n expone un stream(que es un flujo de datos continuos) con la lista completa de petroglifos.
+    Se conecta a la fachada db y mapea cada documento recuperado a instancias
+    estructuradas los Petroglifos reconstruyendo tambien sus listas internas 
+    de imagenes y archivos multimedia.
+  */
   Stream<List<Petroglifo>> listarPetroglifos() {
     return _dbServicio.obtenerStreamColeccion('petroglifos').map((snapshot) {
       return snapshot.docs.map((doc) {
@@ -84,25 +103,26 @@ class ControladorGestionArqueologica {
     });
   }
 
+  /*
+    Esta funcion calcula y genera de forma secuencial el siguiente código identificador disponible
+    para un petroglifo (utilizando el prefijo geográfico 'MAU-'). Evalua los registros existentes
+    para determinar el numero mas alto registrado y previene colisiones en caso de
+    eliminaciones intermedias, incluyendo un mecanismo de respaldo basado en marcas de tiempo.
+  */
   Future<String> generarSiguienteCodigoPetroglifo() async {
     try {
-      // Obtenemos los documentos directamente del servicio de Firestore
       final snapshot = await _dbServicio.obtenerColeccion('petroglifos').get();
       
       if (snapshot.docs.isEmpty) {
-        // Si no hay ningún petroglifo, empezamos con el primero
         return 'MAU-01';
       }
 
       int maxNumero = 0;
 
-      // Iteramos sobre todos los petroglifos existentes para encontrar de forma segura el número más alto
-      // (Esto previene errores si algún documento intermedio fue eliminado)
       for (var doc in snapshot.docs) {
-        String idActual = doc.id; // Ejemplo: "MAU-03"
+        String idActual = doc.id;
         
         if (idActual.startsWith('MAU-')) {
-          // Extraemos la parte numérica después del guion
           String parteNumerica = idActual.substring(4); 
           int? numero = int.tryParse(parteNumerica);
           
@@ -112,35 +132,34 @@ class ControladorGestionArqueologica {
         }
       }
 
-      // Incrementamos en 1 el valor máximo encontrado
       int siguienteNumero = maxNumero + 1;
-
-      // Retornamos el código formateado con dos dígitos usando padLeft (ej: 4 -> '04')
       return 'MAU-${siguienteNumero.toString().padLeft(2, '0')}';
     } catch (e) {
       print('Error al generar código secuencial, usando respaldo por defecto: $e');
-      // Respaldo seguro ante fallos imprevistos de red
       return 'MAU-${DateTime.now().millisecondsSinceEpoch}';
     }
   }
 
+  /*
+    esta funcion coordina el registro integral de un nuevo petroglifo en el sistema. Genera de
+    forma ordenada el ID correlativo, compone las estructuras multimedia, procesa el algoritmo
+    de conversión de imagenes a Base64, e inserta concurrentemente el petroglifo y su Ficha Técnica 
+    enlazada mediante claves foraneas, actualizando finalmente las referencias en el sitio arqueologico.
+  */
   Future<bool> registrarPetroglifo({
     required String nombre,
     required List<PlatformFile> fotosCandidatas, 
     required int indicePrincipal,
     required List<PlatformFile> archivosExtra,
     required Sitio sitioSeleccionado,
-    // RECIBIMOS LOS CAMPOS DE LA FICHA TÉCNICA REQUERIDOS DESDE LA INTERFAZ
     required String descripcionFicha,
     required MotivoPetroglifo motivoFicha,
     required TecnicaGrabado tecnicaFicha,
     required TipoRoca rocaFicha,
   }) async {
     try {
-      // 1. Solicitamos de forma asíncrona el siguiente código secuencial disponible (Ej: "MAU-05")
       String nuevoPetroglifoId = await generarSiguienteCodigoPetroglifo();
 
-      // 2. Estructuramos las entidades de imágenes con IDs únicos
       List<Imagen> listaImagenes = [];
       for (int i = 0; i < fotosCandidatas.length; i++) {
         final fileCandidate = fotosCandidatas[i];
@@ -158,7 +177,6 @@ class ControladorGestionArqueologica {
         ));
       }
 
-      // 3. Estructuramos los archivos multimedia adicionales
       List<ArchivoMultimedia> listaMultimedia = archivosExtra.map((file) {
         String rutaSeguraMultimedia = (file.path != null && file.path!.isNotEmpty) 
             ? file.path! 
@@ -172,7 +190,6 @@ class ControladorGestionArqueologica {
         );
       }).toList();
 
-      // 4. Instanciamos el objeto de dominio Petroglifo usando el nuevo ID secuencial
       Petroglifo nuevoPetroglifo = Petroglifo(
         id: nuevoPetroglifoId, 
         nombre: nombre.trim(),
@@ -180,31 +197,26 @@ class ControladorGestionArqueologica {
         archivosMultimedia: listaMultimedia,
       );
 
-      // 5. EJECUCIÓN DEL ALGORITMO: Transformación de Ronald
       nuevoPetroglifo.imagenesBase64 = await transformacionDeRonald(
         fotosVisualizables: fotosCandidatas, 
         imagenes: nuevoPetroglifo.imagenes
       );
 
-      // 6. Transacción Pura 1: Envío del Petroglifo a su respectiva colección
       await _dbServicio.guardarPetroglifo(nuevoPetroglifo.id, nuevoPetroglifo.toFirestore());
 
-      // 7. Transacción Pura 2: Instanciar y Guardar la Ficha Técnica oficial enlazada
       FichaTecnica nuevaFicha = FichaTecnica(
         id: 'ficha_$nuevoPetroglifoId',
-        codigoPetroglifo: nuevoPetroglifoId, // <--- Relación de Clave Foránea
+        codigoPetroglifo: nuevoPetroglifoId, 
         descripcion: descripcionFicha.trim(),
         motivo: motivoFicha,
         tecnicaGrabado: tecnicaFicha,
         tpoRoca: rocaFicha,
       );
 
-      // Guardamos la ficha en una colección dedicada compartiendo la llave del documento
       await _dbServicio.obtenerColeccion('fichas_tecnicas')
           .doc(nuevaFicha.id)
           .set(nuevaFicha.toFirestore());
 
-      // 8. Sincronización en el Sitio Arqueológico correspondiente
       sitioSeleccionado.AgregarPetroglifo(nuevoPetroglifo.id);
       await _dbServicio.actualizarPetroglifosEnSitio(sitioSeleccionado.id, sitioSeleccionado.petroglifosIds);
 
@@ -215,10 +227,14 @@ class ControladorGestionArqueologica {
     }
   }
 
+  /*
+    esta funcion busca y recupera la Ficha Tecnica asociada a un petroglifo específico. 
+    Consulta el documento correspondiente en Firestore por su clave y reconstruye 
+    la entidad convirtiendo de manera segura los valores primitivos de texto a los Enums fuertemente 
+    tipados del lenguaje Dart.
+  */
   Future<FichaTecnica?> buscarFicha(String petroglifoId) async {
     try {
-      // Buscamos el documento cuyo ID estructural es 'ficha_MAU-XX'
-      
       final doc = await _dbServicio.obtenerDocumentoPorId('fichas_tecnicas', 'ficha_$petroglifoId');
       if (!doc.exists || doc.data() == null) {
         return null;
@@ -226,7 +242,6 @@ class ControladorGestionArqueologica {
 
       final data = doc.data()!;
 
-      // Reconvertimos de manera segura los Strings de Firestore a los Enums de Dart
       final motivoEnum = MotivoPetroglifo.values.firstWhere(
         (e) => e.name == data['motivo'],
         orElse: () => MotivoPetroglifo.indeterminado,
@@ -256,56 +271,63 @@ class ControladorGestionArqueologica {
     }
   }
   
+  /*
+    esta función realiza una consulta filtrada en la base de datos para obtener un listado de petroglifos 
+    cuyo nombre coincida de forma exacta con el nombre que pide. Procesa los documentos resultantes y
+    mapea los datos primitivos devueltos a objetos de la clase de dominio Petroglifo.
+  */
   Future<List<Petroglifo>> buscarPetroglifosPorNombre(String nombre) async {
-  try {
-    final snapshot = await _dbServicio.obtenerDocumentosPorFiltro(
-      nombreColeccion: 'petroglifos',
-      campo: 'nombre',
-      operacion: 'isEqualTo',
-      valor: nombre.trim(),
-    );
-
-    return snapshot.docs.map((doc) {
-      final data = doc.data();
-
-      final List<dynamic> imgsData = data['imagenes'] ?? [];
-      final List<Imagen> listaImagenes = imgsData.map((img) {
-        return Imagen(
-          id: img['id'] ?? '',
-          nombreArchivo: img['nombreArchivo'] ?? '',
-          tipoArchivo: img['tipoArchivo'] ?? '',
-          rutaArchivo: img['rutaArchivo'] ?? '',
-          url: img['base64Data'] ?? img['url'] ?? '',
-          isPrincipal: img['isPrincipal'] ?? false,
-        );
-      }).toList();
-
-      final List<dynamic> arcData = data['archivosMultimedia'] ?? [];
-      final List<ArchivoMultimedia> listaArchivos = arcData.map((arc) {
-        return ArchivoMultimedia(
-          id: arc['id'] ?? '',
-          nombreArchivo: arc['nombreArchivo'] ?? '',
-          tipoArchivo: arc['tipoArchivo'] ?? '',
-          rutaArchivo: arc['rutaArchivo'] ?? '',
-        );
-      }).toList();
-
-      return Petroglifo(
-        id: data['id'] ?? doc.id,
-        nombre: data['nombre'] ?? '',
-        imagenes: listaImagenes,
-        archivosMultimedia: listaArchivos,
+    try {
+      final snapshot = await _dbServicio.obtenerDocumentosPorFiltro(
+        nombreColeccion: 'petroglifos',
+        campo: 'nombre',
+        operacion: 'isEqualTo',
+        valor: nombre.trim(),
       );
-    }).toList();
-  } catch (e) {
-    print("Error buscando petroglifos: $e");
-    return [];
+
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+
+        final List<dynamic> imgsData = data['imagenes'] ?? [];
+        final List<Imagen> listaImagenes = imgsData.map((img) {
+          return Imagen(
+            id: img['id'] ?? '',
+            nombreArchivo: img['nombreArchivo'] ?? '',
+            tipoArchivo: img['tipoArchivo'] ?? '',
+            rutaArchivo: img['rutaArchivo'] ?? '',
+            url: img['base64Data'] ?? img['url'] ?? '',
+            isPrincipal: img['isPrincipal'] ?? false,
+          );
+        }).toList();
+
+        final List<dynamic> arcData = data['archivosMultimedia'] ?? [];
+        final List<ArchivoMultimedia> listaArchivos = arcData.map((arc) {
+          return ArchivoMultimedia(
+            id: arc['id'] ?? '',
+            nombreArchivo: arc['nombreArchivo'] ?? '',
+            tipoArchivo: arc['tipoArchivo'] ?? '',
+            rutaArchivo: arc['rutaArchivo'] ?? '',
+          );
+        }).toList();
+
+        return Petroglifo(
+          id: data['id'] ?? doc.id,
+          nombre: data['nombre'] ?? '',
+          imagenes: listaImagenes,
+          archivosMultimedia: listaArchivos,
+        );
+      }).toList();
+    } catch (e) {
+      print("Error buscando petroglifos: $e");
+      return [];
+    }
   }
-}
   
-  // ==========================================
-  // SECCIÓN 2: GESTIÓN DE SITIOS ARQUEOLÓGICOS
-  // ==========================================
+  //==========================================
+  //SITIOS
+  //==========================================
+  
+ 
   Future<bool> registrarSitio({
     required String nombre,
     required String codigoInterno,
@@ -337,25 +359,24 @@ class ControladorGestionArqueologica {
     }
   }
 
+ 
   Stream<List<Sitio>> listarSitios() {
     return _dbServicio.obtenerStreamColeccion('sitios').map((snapshot) {
       return snapshot.docs.map((doc) {
         final data = doc.data();
         
-        // 1. RECONVERSIÓN SEGURA: De String de Firestore a Enum de Dart
         final estadoEnum = EstadoAcceso.values.firstWhere(
           (e) => e.name == data['estadoAcceso'],
-          orElse: () => EstadoAcceso.publico, // Valor por defecto si no coincide o es nulo
+          orElse: () => EstadoAcceso.publico, 
         );
 
-        // 2. RETORNO CON LOS TIPOS CORRECTOS
         return Sitio(
           id: data['id'] ?? '',
           nombre: data['nombre'] ?? '',
           codigoInterno: data['codigoInterno'] ?? '',
           comuna: data['comuna'] ?? '',
           descripcion: data['descripcion'] ?? '',
-          estadoAcceso: estadoEnum, // <--- Ahora sí recibe un 'EstadoAcceso' real
+          estadoAcceso: estadoEnum, 
           latitud: (data['latitud'] as num?)?.toDouble() ?? 0.0,
           longitud: (data['longitud'] as num?)?.toDouble() ?? 0.0,
           petroglifosIds: List<String>.from(data['petroglifosIds'] ?? []), 
@@ -364,62 +385,64 @@ class ControladorGestionArqueologica {
     });
   }
 
+  /*
+    esta funcion actualiza la informacion de un sitio existente. 
+    Toma el objeto, lo mape y ejecuta 
+    una modificación genérica sobre el identificador del documento.
+  */
   Future<bool> actualizarSitio({
     required Sitio sitio,
-}) async {
-
-    try{
-
+  }) async {
+    try {
        await _dbServicio.actualizarDocumentoGenerico(nombreColeccion: 'sitios', id: sitio.id, datosAActualizar: sitio.toFirestore());
-
-        return true;
-
-    }catch(e){
-
+       return true;
+    } catch (e) {
         print(e);
-
         return false;
     }
-}
-
-  Future<List<Sitio>> buscarSitiosPorCodigoInterno(String codigo) async {
-  try {
-    final snapshot = await _dbServicio.obtenerDocumentosPorFiltro(
-      nombreColeccion: 'sitios',
-      campo: 'codigoInterno',
-      operacion: 'isEqualTo',
-      valor: codigo.trim(),
-    );
-
-    return snapshot.docs.map((doc) {
-      final data = doc.data();
-
-      final estadoEnum = EstadoAcceso.values.firstWhere(
-        (e) => e.name == data['estadoAcceso'],
-        orElse: () => EstadoAcceso.publico,
-      );
-
-      return Sitio(
-        id: data['id'] ?? doc.id,
-        nombre: data['nombre'] ?? '',
-        codigoInterno: data['codigoInterno'] ?? '',
-        comuna: data['comuna'] ?? '',
-        descripcion: data['descripcion'] ?? '',
-        estadoAcceso: estadoEnum,
-        latitud: (data['latitud'] as num?)?.toDouble() ?? 0.0,
-        longitud: (data['longitud'] as num?)?.toDouble() ?? 0.0,
-        petroglifosIds: List<String>.from(data['petroglifosIds'] ?? []),
-      );
-    }).toList();
-  } catch (e) {
-    print('Error al buscar sitio por código interno: $e');
-    return [];
   }
-}
+
+ 
+  Future<List<Sitio>> buscarSitiosPorCodigoInterno(String codigo) async {
+    try {
+      final snapshot = await _dbServicio.obtenerDocumentosPorFiltro(
+        nombreColeccion: 'sitios',
+        campo: 'codigoInterno',
+        operacion: 'isEqualTo',
+        valor: codigo.trim(),
+      );
+
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+
+        final estadoEnum = EstadoAcceso.values.firstWhere(
+          (e) => e.name == data['estadoAcceso'],
+          orElse: () => EstadoAcceso.publico,
+        );
+
+        return Sitio(
+          id: data['id'] ?? doc.id,
+          nombre: data['nombre'] ?? '',
+          codigoInterno: data['codigoInterno'] ?? '',
+          comuna: data['comuna'] ?? '',
+          descripcion: data['descripcion'] ?? '',
+          estadoAcceso: estadoEnum,
+          latitud: (data['latitud'] as num?)?.toDouble() ?? 0.0,
+          longitud: (data['longitud'] as num?)?.toDouble() ?? 0.0,
+          petroglifosIds: List<String>.from(data['petroglifosIds'] ?? []),
+        );
+      }).toList();
+    } catch (e) {
+      print('Error al buscar sitio por código interno: $e');
+      return [];
+    }
+  }
 
   //==========================================
-  //SECCION 3: GESTION DE BITACORAS
+  //BITAORAS
   //==========================================
+  
+ 
   Future<bool> registrarBitacora({
     required String id,
     required DateTime fechaInicio,
@@ -463,123 +486,124 @@ class ControladorGestionArqueologica {
     });
   }
 
-  // =========================================================================
-  // FILTRO: Obtener Bitácoras por Fecha de Inicio (Menor o Igual) de forma directa
-  // =========================================================================
-  // En el Controlador
-Future<List<Bitacora>> obtenerBitacorasPorFecha(DateTime fechaLimite) async {
-  try {
-    String fechaLimiteIso = fechaLimite.toIso8601String();
+  /*
+    esta funcion recupera bitacoras cuyo inicio sea previo o igual a una fecha limite provista.
+    pa poder despues usar cuando se este generando un reporte
+  */
+  Future<List<Bitacora>> obtenerBitacorasPorFecha(DateTime fechaLimite) async {
+    try {
+      String fechaLimiteIso = fechaLimite.toIso8601String();
 
-    
-    final snapshot = await _dbServicio.obtenerDocumentosPorFiltro(
-      nombreColeccion: 'bitacoras',
-      campo: 'fechaInicio',
-      operacion: 'lessThanOrEqualTo',
-      valor: fechaLimiteIso,
-    );
+      final snapshot = await _dbServicio.obtenerDocumentosPorFiltro(
+        nombreColeccion: 'bitacoras',
+        campo: 'fechaInicio',
+        operacion: 'lessThanOrEqualTo',
+        valor: fechaLimiteIso,
+      );
 
-    
-    return snapshot.docs.map((doc) {
-      final data = doc.data();
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        return Bitacora(
+          id: data['id'] ?? doc.id,
+          fechaInicio: DateTime.tryParse(data['fechaInicio'] ?? '') ?? DateTime.now(),
+          fechaFin: DateTime.tryParse(data['fechaFin'] ?? '') ?? DateTime.now(),
+          idParticipantes: List<String>.from(data['idParticipantes'] ?? []),
+          actividad: data['actividad'] ?? '',
+          observaciones: data['observaciones'] ?? '',
+        );
+      }).toList();
+    } catch (e) {
+      print('Error al filtrar bitácoras por fecha en el controlador: $e');
+      return [];
+    }
+  }
+
+  /*
+    esta funcion busca una bitacora de terreno mediante su ID unico
+    en caso de encontrar el documento, extrae listados de participantes 
+    y transforma las cadenas temporales ISO al tipo de dato nativo del sistema.
+  */
+  Future<Bitacora?> buscarBitacora(String idBitacora) async {
+    try {
+      final doc = await _dbServicio.obtenerDocumentoPorId('bitacoras', idBitacora);
+          
+      if (!doc.exists || doc.data() == null) {
+        return null;
+      }
+
+      final data = doc.data()!;
+
+      final DateTime fechaInicioEnum = data['fechaInicio'] != null 
+          ? DateTime.parse(data['fechaInicio']) 
+          : DateTime.now();
+          
+      final DateTime fechaFinEnum = data['fechaFin'] != null 
+          ? DateTime.parse(data['fechaFin']) 
+          : DateTime.now();
+
+      final List<String> participantesList = data['idParticipantes'] != null
+          ? List<String>.from(data['idParticipantes'])
+          : [];
+
       return Bitacora(
         id: data['id'] ?? doc.id,
-        fechaInicio: DateTime.tryParse(data['fechaInicio'] ?? '') ?? DateTime.now(),
-        fechaFin: DateTime.tryParse(data['fechaFin'] ?? '') ?? DateTime.now(),
-        idParticipantes: List<String>.from(data['idParticipantes'] ?? []),
-        actividad: data['actividad'] ?? '',
+        fechaInicio: fechaInicioEnum,
+        fechaFin: fechaFinEnum,
+        idParticipantes: participantesList,
+        actividad: data['actividad'] ?? 'Sin actividad especificada',
         observaciones: data['observaciones'] ?? '',
       );
-    }).toList();
-  } catch (e) {
-    print('Error al filtrar bitácoras por fecha en el controlador: $e');
-    return [];
-  }
-}
-
-  Future<Bitacora?> buscarBitacora(String idBitacora) async {
-  try {
-    // Buscamos el documento en la colección 'bitacoras'
-    final doc = await _dbServicio.obtenerDocumentoPorId('bitacoras', idBitacora);
-        
-
-    if (!doc.exists || doc.data() == null) {
+    } catch (e) {
+      print('Error al buscar la bitácora con ID $idBitacora: $e');
       return null;
     }
-
-    final data = doc.data()!;
-
-    
-    final DateTime fechaInicioEnum = data['fechaInicio'] != null 
-        ? DateTime.parse(data['fechaInicio']) 
-        : DateTime.now();
-        
-    final DateTime fechaFinEnum = data['fechaFin'] != null 
-        ? DateTime.parse(data['fechaFin']) 
-        : DateTime.now();
-
-    // Convertimos la lista de Firestore a una List<String> de manera segura
-    final List<String> participantesList = data['idParticipantes'] != null
-        ? List<String>.from(data['idParticipantes'])
-        : [];
-
-    return Bitacora(
-      id: data['id'] ?? doc.id,
-      fechaInicio: fechaInicioEnum,
-      fechaFin: fechaFinEnum,
-      idParticipantes: participantesList,
-      actividad: data['actividad'] ?? 'Sin actividad especificada',
-      observaciones: data['observaciones'] ?? '',
-    );
-  } catch (e) {
-    print('Error al buscar la bitácora con ID $idBitacora: $e');
-    return null;
   }
-}
+  
   
   Future<bool> actualizarBitacora({
-  required Bitacora bitacora,
-}) async {
-  try {
-    await _dbServicio.actualizarDocumentoGenerico(
-      nombreColeccion: 'bitacoras',
-      id: bitacora.id,
-      datosAActualizar: bitacora.toFirestore(),
-    );
-
-    return true;
-  } catch (e) {
-    print('Error al actualizar bitácora: $e');
-    return false;
+    required Bitacora bitacora,
+  }) async {
+    try {
+      await _dbServicio.actualizarDocumentoGenerico(
+        nombreColeccion: 'bitacoras',
+        id: bitacora.id,
+        datosAActualizar: bitacora.toFirestore(),
+      );
+      return true;
+    } catch (e) {
+      print('Error al actualizar bitácora: $e');
+      return false;
+    }
   }
-}
   
   //========================================
-  //SECCION 4: REPOETES
+  //REPORTES
   //========================================
+  
+ 
   Future<bool> registrarReporte({
-  required String id,
-  required DateTime fechaGeneracion,
-  required DateTime rangoFecha,
-  required List<String> idBitacoras,
-}) async {
-  try {
-    // Creamos la instancia correcta usando tu modelo estructurado
-    ReporteTecnico nuevoReporte = ReporteTecnico(
-      id: id.trim(),
-      fechaGeneracion: fechaGeneracion,
-      rangoFecha: rangoFecha,
-      idBitacoras: idBitacoras.map((id) => id.trim()).toList(),
-    );
+    required String id,
+    required DateTime fechaGeneracion,
+    required DateTime rangoFecha,
+    required List<String> idBitacoras,
+  }) async {
+    try {
+      ReporteTecnico nuevoReporte = ReporteTecnico(
+        id: id.trim(),
+        fechaGeneracion: fechaGeneracion,
+        rangoFecha: rangoFecha,
+        idBitacoras: idBitacoras.map((id) => id.trim()).toList(),
+      );
 
-    // IMPORTANTE: Asegúrate de que guardarReporte use internamente la colección 'reportes'
-    await _dbServicio.guardarReporte(nuevoReporte.id, nuevoReporte.toFirestore());
-    return true;
-  } catch (e) {
-    print('Error al registrar reporte en el controlador: $e');
-    return false;
+      await _dbServicio.guardarReporte(nuevoReporte.id, nuevoReporte.toFirestore());
+      return true;
+    } catch (e) {
+      print('Error al registrar reporte en el controlador: $e');
+      return false;
+    }
   }
-}
+
+ 
   Stream<List<ReporteTecnico>> listarReportes() {
     return _dbServicio.obtenerStreamColeccion('reportes').map((snapshot) {
       return snapshot.docs.map((doc) {

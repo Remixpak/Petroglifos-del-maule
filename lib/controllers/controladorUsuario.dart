@@ -1,18 +1,20 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:software_petroglifos/models/usuario.dart';
-import 'package:software_petroglifos/controllers/firestoreService.dart';
+import 'package:software_petroglifos/controllers/ConexionFirestore.dart';
+
 /*
-CAMBIAR NOMBRE A CONTROLADORUSUARIO
+  este archivo centraliza la logica para la gestión de usuarios, el control
+  de acceso Actua como puente entre el formulario y el servicio de
+  Firebase Authentication y los registros adicionales del perfil en Firestore.
+  el registro listado y actulizacion funciona practicamente igual a lo que esta 
+  en el controlador de gestion arqueologica asi que no voy a comentarlo
 */
-
-
 
 class ControladorUsuario {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirestoreService _dbServicio = FirestoreService();
+  final ConexionFirestore _dbServicio = ConexionFirestore();
 
-  // Trasladar este método luego a la clase usuario
   Future<bool> registrarUsuario({
     required String nombre,
     required String correo,
@@ -21,13 +23,11 @@ class ControladorUsuario {
     required String institucion,
   }) async {
     try {
-      // 1. Crear el usuario en Firebase Authentication
       UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
         email: correo.trim(),
         password: clave.trim(),
       );
 
-      // Obtener el ID único generado por Firebase Auth
       String uid = userCredential.user!.uid;
       Usuario nuevoUsuario = Usuario(
         id: uid,
@@ -39,36 +39,30 @@ class ControladorUsuario {
         isActive: true, 
       );
 
-      
-     await _dbServicio.guardarUsuario(nuevoUsuario.id, nuevoUsuario.toFirestore());
-        
-
+      await _dbServicio.guardarUsuario(nuevoUsuario.id, nuevoUsuario.toFirestore());
       print('Usuario registrado con éxito en Auth y Firestore UID: $uid');
       return true;
     } catch (e) {
       print('Error en el registro: $e');
       return false;
     }
-    
   }
 
-  /// Lista los usuarios desde Firestore en tiempo real como un Stream de objetos [Usuario]
   Stream<List<Usuario>> listarUsuarios() {
     return _dbServicio.obtenerStreamColeccion('usuarios').map((snapshot) {
       return snapshot.docs.map((doc) {
         final data = doc.data();
 
-        // Mapeo seguro del Rol (String a Enum)
         Rol rolUsuario = Rol.values.firstWhere(
           (r) => r.name == data['rol'],
-          orElse: () => Rol.investigador, // Corregido a tu capitalización exacta
+          orElse: () => Rol.investigador, 
         );
 
         return Usuario(
           id: data['id'] ?? doc.id,
           nombre: data['nombre'] ?? 'Sin Nombre',
           correo: data['correo'] ?? '',
-          clave: '', // <--- AQUÍ: Pasamos string vacío ya que la clave no se guarda en Firestore
+          clave: '', 
           isActive: data['isActive'] ?? true,
           rol: rolUsuario,
           institucion: data['institucion'] ?? '',
@@ -78,53 +72,55 @@ class ControladorUsuario {
   }
 
   Future<Usuario?> buscarUsuario(String idParticipante) async {
-  try {
-    
-    final doc = await _dbServicio.obtenerDocumentoPorId('usuarios', idParticipante);
+    try {
+      final doc = await _dbServicio.obtenerDocumentoPorId('usuarios', idParticipante);
 
-    // Si el documento no existe o viene vacío, retornamos el ID como fallback
-    if (!doc.exists || doc.data() == null) {
-      return null; 
-    }
+      if (!doc.exists || doc.data() == null) {
+        return null; 
+      }
 
-    final data = doc.data()!;
+      final data = doc.data()!;
 
-    // 2. PROCESAMOS EL RESULTADO: Extraemos el campo 'nombre' de forma segura
-    return Usuario(
-      id: data['id'] ?? doc.id,
-      nombre: data['nombre'] ?? 'Sin Nombre',
-      correo: data['correo'] ?? '',
-      clave: '', // <--- AQUÍ: Pasamos string vacío ya que la clave no se guarda en Firestore
-      isActive: data['isActive'] ?? true,
-      rol: Rol.values.firstWhere(
-        (r) => r.name == data['rol'],
-        orElse: () => Rol.investigador, // Corregido a tu capitalización exacta
-      ),
-      institucion: data['institucion'] ?? '',
-    );
-
+      return Usuario(
+        id: data['id'] ?? doc.id,
+        nombre: data['nombre'] ?? 'Sin Nombre',
+        correo: data['correo'] ?? '',
+        clave: '', 
+        isActive: data['isActive'] ?? true,
+        rol: Rol.values.firstWhere(
+          (r) => r.name == data['rol'],
+          orElse: () => Rol.investigador, 
+        ),
+        institucion: data['institucion'] ?? '',
+      );
     } catch (e) {
       print('Error al buscar el participante con ID $idParticipante: $e');
       return null;
     }
   }
 
+  /*
+    esta funcion procesa la validacion de identidad e inicio de sesion en la plataforma. 
+    Delega las credenciales de correo electrónico y contraseña ingresadas al motor de Firebase 
+    Authentication para su correspondiente verificacion en el servidor y retorna un 
+    indicador booleano que confirma el éxito de la operacion.
+  */
   Future<bool> iniciarSesion({required String email, required String password}) async {
-  try {
-    // Firebase se encarga de validar la contraseña cifrada internamente en sus servidores
-    UserCredential userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
-      email: email,
-      password: password,
-    );
-    
-   
-    return userCredential.user != null;
-  } catch (e) {
-    print('Error de login en ControladorUsuario: $e');
-    return false;
-  }
+    try {
+      UserCredential userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      return userCredential.user != null;
+    } catch (e) {
+      print('Error de login en ControladorUsuario: $e');
+      return false;
+    }
   }
 
+  /*
+   chao chao
+  */
   Future<bool> cerrarSesion() async {
     try {
       await _auth.signOut();
@@ -136,6 +132,11 @@ class ControladorUsuario {
     }
   }
 
+  /*
+    esta funcion modifica de forma directa el estado de habilitacion de una cuenta de usuario. 
+    Recibe el id y el nuevo indicador booleano de disponibilidad, mapeando la 
+    operacion hacia el metodo de actualizacion generico para impactar la coleccion en la base de datos.
+  */
   Future<void> cambiarEstadoCuenta(String idUsuario, bool nuevoEstado) async {
     try {
       await _dbServicio.actualizarDocumentoGenerico(
@@ -149,13 +150,18 @@ class ControladorUsuario {
     }
   }
   
+  
   Future<bool> actualizarUsuario({
     required Usuario usuario,
   }) async {
-    try{
-      await _dbServicio.actualizarDocumentoGenerico(nombreColeccion: 'usuarios', id: usuario.id, datosAActualizar: usuario.toFirestore());
+    try {
+      await _dbServicio.actualizarDocumentoGenerico(
+        nombreColeccion: 'usuarios', 
+        id: usuario.id, 
+        datosAActualizar: usuario.toFirestore()
+      );
       return true;
-    } catch (e){
+    } catch (e) {
       print('error al actualizar usuario: $e');
       return false;
     }

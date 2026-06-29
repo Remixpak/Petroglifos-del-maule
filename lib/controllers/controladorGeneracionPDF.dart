@@ -3,32 +3,42 @@ import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import 'package:flutter/services.dart' show rootBundle;
-import 'package:software_petroglifos/controllers/firestoreService.dart';
-import 'package:software_petroglifos/models/fichaTecnica.dart';
-import 'package:software_petroglifos/models/petroglifo.dart';
-import 'package:software_petroglifos/models/reporteTecnico.dart';
-import 'package:software_petroglifos/models/bitacora.dart';
-import 'package:software_petroglifos/models/usuario.dart';
+import 'package:software_petroglifos/controllers/ConexionFirestore.dart';
+
+/*
+    este archivo es el que se encarga de gestionar todo lo que tenga 
+    que ver la generacion y descarga de pdfs, la idea es que cuando se 
+    busque generar algun archivo se cree una instancia de este controlador
+    para llamar a las funciones que contiene
+  */
 
 class ControladorGeneracionPDF {
-  final FirestoreService _firestoreService = FirestoreService();
+  final ConexionFirestore _firestoreService = ConexionFirestore();
 
-  // ====================================================================
-  // GENERAR FICHA TÉCNICA (Con Petroglifo e Imágenes Transformadas)
-  // ====================================================================
   
-
+  /*este archivo es el que se encarga de gestionar todo lo que tenga 
+    que ver la generacion y descarga de pdfs, la idea es que cuando se 
+    busque generar algun archivo se cree una instancia de este controlador
+    para llamar a las funciones que contiene
+  */
+ 
+  
+/*
+esta funcion basicamente genera un pdf con la ficha tecnica de un petroglifo
+se conecta con la fachada de la base de datos para obtener la ficha y el petroglifo
+crea el pdf como si se tratara de un widget
+y retorna un Unit8list que es basicamente una lista de enteros del 0 al 255 que se usa pa 
+manejar datos binarios y asi trabajar con las imagenes del petroglifo entre otras cosas de forma
+mas eficiente
+*/
 Future<Uint8List> generarFichaTecnica(String idFicha) async {
   final pdf = pw.Document();
   print(idFicha);
-  
-  // 1. Cargar una fuente que soporte Unicode de forma nativa (Roboto por ejemplo)
-  // Nota: Usa 'PdfGoogleFonts' del paquete 'printing' para descargarla al vuelo de forma limpia
+ 
   final fuenteNormal = await PdfGoogleFonts.robotoRegular();
   final fuenteNegrita = await PdfGoogleFonts.robotoBold();
 
-  // 2. Recuperar Ficha Técnica desde Firestore
+  
   final docFicha = await _firestoreService.obtenerDocumentoPorId('fichas_tecnicas', idFicha);
   if (!docFicha.exists) throw Exception('Ficha técnica no encontrada');
   
@@ -37,7 +47,7 @@ Future<Uint8List> generarFichaTecnica(String idFicha) async {
   final docPetro = await _firestoreService.obtenerDocumentoPorId('petroglifos', datosFicha['codigoPetroglifo']);
   Map<String, dynamic>? datosPetro = docPetro.exists ? docPetro.data() : null;
 
-  // Aplicamos las fuentes Unicode cargadas a los estilos
+  
   final estiloTitulo = pw.TextStyle(font: fuenteNegrita, fontSize: 22, color: PdfColors.indigo);
   final estiloSubtitulo = pw.TextStyle(font: fuenteNegrita, fontSize: 14);
   final estiloTexto = pw.TextStyle(font: fuenteNormal, fontSize: 12);
@@ -45,7 +55,6 @@ Future<Uint8List> generarFichaTecnica(String idFicha) async {
   pdf.addPage(
     pw.MultiPage(
       pageFormat: PdfPageFormat.letter,
-      // Aplicamos el tema global a la página para que todo texto hijo use Roboto por defecto
       theme: pw.ThemeData.withFont(base: fuenteNormal, bold: fuenteNegrita),
       build: (pw.Context context) {
         List<pw.Widget> widgetsImagenes = [];
@@ -100,40 +109,38 @@ Future<Uint8List> generarFichaTecnica(String idFicha) async {
   return pdf.save();
 }
 
-  // ====================================================================
-  // GENERAR REPORTE TÉCNICO (Con Bitácoras y Nombres de Participantes)
-  // ====================================================================
+  /*
+  Ficha.misma logica
+  */
   Future<Uint8List> generarReporteTecnico(String idReporte) async {
   final pdf = pw.Document();
 
-  // 1. Cargar fuentes que soportan Unicode de forma nativa
+  
   final fuenteNormal = await PdfGoogleFonts.robotoRegular();
   final fuenteNegrita = await PdfGoogleFonts.robotoBold();
 
-  // Estilos tipográficos explícitos usando las fuentes cargadas
+  
   final estiloTitulo = pw.TextStyle(font: fuenteNegrita, fontSize: 22, color: PdfColors.brown);
   final estiloSubtitulo = pw.TextStyle(font: fuenteNegrita, fontSize: 14);
   final estiloTextoBold = pw.TextStyle(font: fuenteNegrita, fontSize: 12);
   final estiloTextoNormal = pw.TextStyle(font: fuenteNormal, fontSize: 12);
   final estiloParticipantes = pw.TextStyle(font: fuenteNormal, fontSize: 12, color: PdfColors.indigo700);
 
-  // 2. Recuperar Reporte
-  final docReporte = await _firestoreService.obtenerDocumentoPorId('reportes', idReporte);
+    final docReporte = await _firestoreService.obtenerDocumentoPorId('reportes', idReporte);
   if (!docReporte.exists) throw Exception('Reporte técnico no encontrado');
   final datosReporte = docReporte.data()!;
 
   List<String> idBitacoras = List<String>.from(datosReporte['idBitacoras'] ?? []);
   List<pw.Widget> widgetsBitacoras = [];
 
-  // 3. Iterar sobre las bitácoras asociadas al reporte
-  for (String idBitacora in idBitacoras) {
+    for (String idBitacora in idBitacoras) {
     final docBitacora = await _firestoreService.obtenerDocumentoPorId('bitacoras', idBitacora);
     if (docBitacora.exists) {
       final datosBitacora = docBitacora.data()!;
       List<String> idParticipantes = List<String>.from(datosBitacora['idParticipantes'] ?? []);
       List<String> nombresParticipantes = [];
 
-      // Buscar solo el nombre de cada participante en la colección usuarios
+     
       for (String idPart in idParticipantes) {
         final docUser = await _firestoreService.obtenerDocumentoPorId('usuarios', idPart);
         if (docUser.exists) {
@@ -163,11 +170,10 @@ Future<Uint8List> generarFichaTecnica(String idFicha) async {
     }
   }
 
-  // 4. Construcción del documento usando el tema de fuentes global
-  pdf.addPage(
+   pdf.addPage(
     pw.MultiPage(
       pageFormat: PdfPageFormat.letter,
-      // Aplicamos el tema para heredar las fuentes por defecto en toda la estructura interna
+      
       theme: pw.ThemeData.withFont(base: fuenteNormal, bold: fuenteNegrita),
       build: (pw.Context context) {
         return [
@@ -187,11 +193,12 @@ Future<Uint8List> generarFichaTecnica(String idFicha) async {
   return pdf.save();
 }
 
-  // ====================================================================
-  // DESCARGAR Y GUARDAR EL ARCHIVO (Android & Windows)
-  // ====================================================================
-  /// Utiliza la API compartida de 'printing' que genera el flujo de guardado de archivos
-  /// nativo de Windows (File Explorer) y la cola de descargas/impresión de Android.
+  
+ /*
+ esta funcion descarga el pdf, recibe la cadena con la data y un nombre sugerido 
+ el sharePdf lo que hace es que te manda a esta clasica pantalla de previsualizacion
+ del documento, como cuando se te abre el chrome pa descargar el docuemnto y eso nomas
+ */
   Future<void> descargarPDF(Future<Uint8List> dataPdfFuture, String nombreSugeridoArchivo) async {
     final Uint8List bytes = await dataPdfFuture;
 

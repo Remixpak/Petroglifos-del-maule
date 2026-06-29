@@ -123,7 +123,7 @@ class _PantallaSugerenciaState extends State<PantallaSugerencia> {
                                     Text('ID Registro: $idSugerencia', style: const TextStyle(color: Colors.grey, fontSize: 11)),
                                     const SizedBox(height: 12),
                                     
-                                    // Bloque interactivo de control de estados condicional por Rol
+                                    
                                     if (esUsuarioActualAdmin) ...[
                                       Container(
                                         decoration: BoxDecoration(
@@ -162,15 +162,14 @@ class _PantallaSugerenciaState extends State<PantallaSugerencia> {
                                               ),
                                             );
 
-                                            // Ejecuta la actualización sobre el documento de la colección 'sugerencias'
+                                            
                                             _controladorUsuario.cambiarEstadoCuenta(idSugerencia, nuevoEstado); 
-                                            // NOTA TÉCNICA INTERNA: Si implementas un método específico, reemplaza la línea anterior por:
-                                            // _controladorSugerencia.cambiarEstadoSugerencia(idSugerencia, nuevoEstado);
+                                            
                                           },
                                         ),
                                       ),
                                     ] else ...[
-                                      // Vista de solo lectura para arqueólogos o investigadores regulares
+                                      
                                       Row(
                                         children: [
                                           Icon(

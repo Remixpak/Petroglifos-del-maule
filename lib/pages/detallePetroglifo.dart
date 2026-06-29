@@ -1,13 +1,14 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
-
-
-// Importaciones de tus modelos y controladores
 import 'package:software_petroglifos/controllers/controladorGestionArqueologica.dart';
-import 'package:software_petroglifos/controllers/controladorGeneracionPDF.dart'; // <-- NUEVO IMPORT
+import 'package:software_petroglifos/controllers/controladorGeneracionPDF.dart'; 
 import 'package:software_petroglifos/models/petroglifo.dart';
 import 'package:software_petroglifos/models/fichaTecnica.dart';
+
+/*
+  Esta clase es la pantalla que se encarga de renderizar la vista detallada de un petroglifo 
+  específico.
+*/
 
 class DetallePetroglifo extends StatefulWidget {
   final Petroglifo petroglifo;
@@ -20,257 +21,240 @@ class DetallePetroglifo extends StatefulWidget {
 
 class _DetallePetroglifoState extends State<DetallePetroglifo> {
   final _controladorNegocio = ControladorGestionArqueologica();
-  final _controladorPDF = ControladorGeneracionPDF(); // <-- Instancia del controlador de PDF
+  final _controladorPDF = ControladorGeneracionPDF(); 
   
   FichaTecnica? _fichaTecnica;
   bool _cargandoFicha = true;
-  bool _exportandoPDF = false; // Estado local para mostrar un spinner al descargar
+  bool _exportandoPDF = false; 
 
+  
   @override
   void initState() {
     super.initState();
     _cargarFichaAsociada();
   }
 
+  /*
+    este metodo realiza una consulta a traves del controlador arqueologico para
+    recuperar el documento de la ficha tecnica vinculada al identificador del petroglifo actual
+  */
   Future<void> _cargarFichaAsociada() async {
     try {
       final ficha = await _controladorNegocio.buscarFicha(widget.petroglifo.id);
-      setState(() {
-        _fichaTecnica = ficha;
-        _cargandoFicha = false;
-      });
+      if (mounted) {
+        setState(() {
+          _fichaTecnica = ficha;
+          _cargandoFicha = false;
+        });
+      }
     } catch (e) {
-      setState(() => _cargandoFicha = false);
+      if (mounted) {
+        setState(() {
+          _cargandoFicha = false;
+        });
+      }
     }
   }
 
-  // MÉTODO NUEVO: Orquesta la generación y descarga nativa multiplataforma
-  Future<void> _descargarFichaPDF() async {
+  /*
+    este metodo coordina el proceso de compilacion y descarga de la ficha
+    Modifica el estado local para activar un indicador visual de progreso, llama a las funciones
+    del controlador de PDF pasando el ID de la ficha tecnica correspondiente
+  */
+  Future<void> _procesarExportacionPDF() async {
     if (_fichaTecnica == null) return;
 
-    setState(() => _exportandoPDF = true);
+    setState(() {
+      _exportandoPDF = true;
+    });
 
     try {
-      // Pasamos el ID de la ficha y el nombre que queremos sugerir para el archivo .pdf
-      await _controladorPDF.descargarPDF(
-        _controladorPDF.generarFichaTecnica(_fichaTecnica!.id),
-        "Ficha_Tecnica_${widget.petroglifo.id}",
-      );
+      final futureData = _controladorPDF.generarFichaTecnica(_fichaTecnica!.id);
+      await _controladorPDF.descargarPDF(futureData, 'Ficha_Tecnica_${widget.petroglifo.id}');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Documento PDF generado de manera exitosa.'),
-            backgroundColor: Colors.green,
-          ),
+          const SnackBar(content: Text('Documento PDF generado y compartido con éxito')),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al generar el PDF: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error al procesar la exportación del PDF: $e')),
         );
       }
     } finally {
       if (mounted) {
-        setState(() => _exportandoPDF = false);
+        setState(() {
+          _exportandoPDF = false;
+        });
       }
     }
   }
 
+  /*
+    construlle la pantalla
+  */
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Detalle: ${widget.petroglifo.id}'),
-        backgroundColor: Colors.brown.shade700,
+        title: Text(widget.petroglifo.nombre, style: const TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.teal.shade700,
         foregroundColor: Colors.white,
         actions: [
-          // BOTÓN DE DESCARGA EN EL APPBAR (Habilitado solo si existe la ficha técnica)
-          if (_fichaTecnica != null)
+          if (!_cargandoFicha && _fichaTecnica != null)
             _exportandoPDF
                 ? const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16.0),
-                    child: Center(
-                      child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                      ),
+                    child: SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                     ),
                   )
                 : IconButton(
                     icon: const Icon(Icons.picture_as_pdf_rounded),
                     tooltip: 'Exportar Ficha a PDF',
-                    onPressed: _descargarFichaPDF,
+                    onPressed: _procesarExportacionPDF,
                   ),
         ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ==========================================
-            // SECCIÓN 1: IDENTIFICACIÓN GENERAL
-            // ==========================================
-            Card(
-              elevation: 2,
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.petroglifo.nombre,
-                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.brown),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Código de Registro: ${widget.petroglifo.id}',
-                      style: TextStyle(fontSize: 14, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // ==========================================
-            // SECCIÓN 2: GALERÍA DE FOTOS (BASE64 / LOCAL)
-            // ==========================================
             const Text(
-              'Registro Fotográfico de Campo',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              'Registro Visual (Transformación de Ronald)',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.teal),
             ),
-            const SizedBox(height: 8),
-            Container(
-              height: 200,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade300),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: widget.petroglifo.imagenes.isEmpty
-                  ? const Center(child: Text('Este petroglifo no registra fotografías.'))
-                  : ListView.builder(
+            const SizedBox(height: 10),
+            widget.petroglifo.imagenes.isEmpty
+                ? Container(
+                    height: 180,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade200,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Center(
+                      child: Text('Sin imágenes registradas', style: TextStyle(color: Colors.grey)),
+                    ),
+                  )
+                : SizedBox(
+                    height: 200,
+                    child: ListView.builder(
                       scrollDirection: Axis.horizontal,
                       itemCount: widget.petroglifo.imagenes.length,
                       itemBuilder: (context, index) {
                         final img = widget.petroglifo.imagenes[index];
-                        bool esPrincipal = img.isPrincipal;
-
                         return Container(
-                          margin: const EdgeInsets.all(8.0),
-                          width: 160,
+                          margin: const EdgeInsets.only(right: 12),
+                          width: 260,
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: esPrincipal ? Colors.green : Colors.grey.shade300, 
-                              width: esPrincipal ? 3 : 1
+                              color: img.isPrincipal ? Colors.teal.shade400 : Colors.grey.shade300,
+                              width: img.isPrincipal ? 2.5 : 1,
                             ),
                           ),
                           child: ClipRRect(
-                            borderRadius: BorderRadius.circular(6),
-                            child: Stack(
-                              fit: StackFit.expand,
-                              children: [
-                                img.url.isNotEmpty
-                                    ? Image.memory(base64Decode(img.url), fit: BoxFit.cover)
-                                    : const Icon(Icons.broken_image, size: 40),
-                                
-                                if (esPrincipal)
-                                  Positioned(
-                                    bottom: 4,
-                                    left: 4,
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      color: Colors.green,
-                                      child: const Text(
-                                        'PRINCIPAL',
-                                        style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                                      ),
-                                    ),
+                            borderRadius: BorderRadius.circular(10),
+                            child: img.url.startsWith('data:image') || !img.url.contains('http')
+                                ? Image.memory(
+                                    base64Decode(img.url.contains(',') ? img.url.split(',')[1] : img.url),
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (c, e, s) => const Center(child: Icon(Icons.broken_image)),
+                                  )
+                                : Image.network(
+                                    img.url,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (c, e, s) => const Center(child: Icon(Icons.broken_image)),
                                   ),
-                              ],
-                            ),
                           ),
                         );
                       },
                     ),
+                  ),
+            const SizedBox(height: 24),
+            const Text(
+              'Ficha Técnica Oficial',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.teal),
             ),
-            const SizedBox(height: 20),
-
-            // ==========================================
-            // SECCIÓN 3: FICHA TÉCNICA ASOCIADA (ASÍNCRONA)
-            // ==========================================
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Row(
-                  children: [
-                    Icon(Icons.assignment_rounded, color: Colors.brown),
-                    SizedBox(width: 8),
-                    Text('Ficha Técnica Vinculada', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.brown)),
-                  ],
-                ),
-                // SECCIÓN DE DESCARGA SECUNDARIA: Botón directo junto al título de la sección
-                if (_fichaTecnica != null && !_exportandoPDF)
-                  TextButton.icon(
-                    onPressed: _descargarFichaPDF,
-                    icon: const Icon(Icons.download_rounded, size: 20, color: Colors.indigo),
-                    label: const Text('Descargar PDF', style: TextStyle(color: Colors.indigo)),
-                  )
-              ],
-            ),
-            const Divider(color: Colors.brown),
-            
+            const Divider(color: Colors.teal, thickness: 1),
+            const SizedBox(height: 8),
             _cargandoFicha
-                ? const Center(child: Padding(padding: EdgeInsets.all(16.0), child: CircularProgressIndicator()))
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: CircularProgressIndicator(),
+                    ),
+                  )
                 : _fichaTecnica == null
-                    ? const Card(
-                        color: Colors.amberAccent,
-                        child: Padding(
+                    ? Card(
+                        color: Colors.amber.shade50,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          side: BorderSide(color: Colors.amber.shade300),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Padding(
                           padding: EdgeInsets.all(12.0),
-                          child: Text('Advertencia: No se encontró una ficha técnica registrada para este código.'),
+                          child: Row(
+                            children: [
+                              Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 28),
+                              SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'Este petroglifo no cuenta con una Ficha Técnica estructurada asociada.',
+                                  style: TextStyle(color: Colors.black87),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       )
                     : Card(
-                        elevation: 1,
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         child: Padding(
                           padding: const EdgeInsets.all(16.0),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _construirItemFicha('Descripción Arqueológica:', _fichaTecnica!.descripcion),
+                              _construirItemFicha('ID Documento:', _fichaTecnica!.id),
+                              const Divider(),
+                              _construirItemFicha('Código de Relación Arqueológica:', _fichaTecnica!.codigoPetroglifo),
                               const Divider(),
                               _construirItemFicha('Motivo del Grabado:', _fichaTecnica!.motivo.name.toUpperCase()),
                               const Divider(),
                               _construirItemFicha('Técnica de Manufactura:', _fichaTecnica!.tecnicaGrabado.name.toUpperCase()),
                               const Divider(),
-                              _construirItemFicha('Soporte Lítico (Roca):', _fichaTecnica!.tpoRoca.name.toUpperCase()),
+                              _construirItemFicha('Soporte Geológico (Tipo de Roca):', _fichaTecnica!.tpoRoca.name.toUpperCase()),
+                              const Divider(),
+                              _construirItemFicha('Descripción Ampliada y Contexto:', _fichaTecnica!.descripcion),
                             ],
                           ),
                         ),
                       ),
-            const SizedBox(height: 20),
-
-            // ==========================================
-            // SECCIÓN 4: ARCHIVOS MULTIMEDIA ADICIONALES
-            // ==========================================
+            const SizedBox(height: 24),
             const Text(
-              'Documentos y Archivos de Audio Adjuntos',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              'Archivos Multimedia Complementarios',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.teal),
             ),
-            const SizedBox(height: 8),
+            const Divider(color: Colors.teal, thickness: 1),
             widget.petroglifo.archivosMultimedia.isEmpty
-                ? Text('No hay archivos multimedia adicionales.', style: TextStyle(color: Colors.grey.shade600, fontSize: 13))
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8.0),
+                    child: Text('No existen archivos de audio o modelados adicionales para este ítem.',
+                        style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic)),
+                  )
                 : Column(
                     children: widget.petroglifo.archivosMultimedia.map((archivo) {
                       return Card(
-                        margin: const EdgeInsets.symmetric(vertical: 4),
+                        margin: const EdgeInsets.symmetric(vertical: 6),
+                        elevation: 1,
                         child: ListTile(
                           leading: const Icon(Icons.audio_file_rounded, color: Colors.blueGrey),
                           title: Text(archivo.nombreArchivo, style: const TextStyle(fontSize: 14)),
@@ -293,6 +277,10 @@ class _DetallePetroglifoState extends State<DetallePetroglifo> {
     );
   }
 
+  /*
+    genera un subarbol de widgets optimizado para visualizar de forma
+    mas ordenada pares clave-valor correspondientes a los campos de la ficha tecnica.
+  */
   Widget _construirItemFicha(String titulo, String valor) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),

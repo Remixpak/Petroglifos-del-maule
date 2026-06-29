@@ -7,8 +7,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:file_selector_platform_interface/file_selector_platform_interface.dart';
 
-
-// Importaciones de tus modelos y controladores del proyecto
 import 'package:software_petroglifos/controllers/controladorGestionArqueologica.dart';
 import 'package:software_petroglifos/controllers/controladorUsuario.dart';
 import 'package:software_petroglifos/controllers/controladorSugerencias.dart';
@@ -16,11 +14,9 @@ import 'package:software_petroglifos/models/bitacora.dart';
 import 'package:software_petroglifos/models/fichaTecnica.dart';
 import 'package:software_petroglifos/models/sitio.dart';
 import 'package:software_petroglifos/models/usuario.dart';
-import 'package:software_petroglifos/pages/homePage.dart';
+import 'package:software_petroglifos/pages/paginaPrincipal.dart';
 
-// =========================================================================
-// ENUM: TIPOS DE REGISTRO CENTRALIZADOS
-// =========================================================================
+
 enum TipoRegistro {
   petroglifo,
   sitio,
@@ -124,7 +120,7 @@ class _FormularioRegistroState extends State<FormularioRegistro> {
   bool get _modoEdicionBitacora => widget.bitacoraEditar != null;
 
   @override
-void initState() {
+  void initState() {
   super.initState();
 
   _verificarSiEsAdmin();
@@ -149,7 +145,7 @@ void initState() {
 
   @override
   void dispose() {
-    // Limpieza absoluta de todos los controladores de texto del sistema
+    //limpieza absoluta de todos los controladores de texto del sistema
     _nombrePetroglifoController.dispose();
     _descripcionFichaController.dispose();
     _nombreSitioController.dispose();
@@ -325,7 +321,10 @@ void initState() {
       Navigator.pop(context);
     }
   }
-
+  /*
+  las funciones cargar rellenan el formulario con la data del objeto
+  esto se usa cuando quieres editar
+  */
   void _cargarSitio(Sitio sitio){
 
     _nombreSitioController.text = sitio.nombre;
@@ -342,7 +341,6 @@ void initState() {
 
     _longitud = sitio.longitud;
 }
-
   Future<void> _procesarEdicionSitio() async {
 
     Sitio sitioActualizado = Sitio(
@@ -396,7 +394,7 @@ if (exito) {
   //=========================================================================
   void _procesarGuardadoUsuario() async {
 
-    // === SECCIÓN DE PRINTS PARA DEPURACIÓN ===
+    // ===debugeando ando===
   print('=============================================');
   print('DEBUG REGISTRO INVESTIGADOR:');
   print('Email: "${_emailController.text}" (Largo: ${_emailController.text.length})');
@@ -418,7 +416,6 @@ if (exito) {
   setState(() => _guardando = true);
 
   try {
-    // Delegamos la creación de la UserCredential y la escritura en Firestore al controlador
     bool registroExitoso = await _controladorUsuario.registrarUsuario(
       nombre: _nombreController.text.trim(),
       correo: _emailController.text.trim(),
@@ -432,12 +429,10 @@ if (exito) {
         const SnackBar(content: Text('¡Investigador registrado correctamente en el sistema!')),
       );
       
-      // Limpiamos los campos específicos de registro para dejar el formulario listo
       _nombreController.clear();
       _rolController.clear();
       _institucionController.clear();
       
-      // Opcional: regresar a la vista de login tras registrar exitosamente
       setState(() => _esLogin = true);
     } else {
       throw Exception('El controlador no pudo completar el registro.');
@@ -455,8 +450,7 @@ if (exito) {
   setState(() => _guardando = true);
 
   try {
-    // Invocamos al método de autenticación del controlador
-    // Recuerda que este método debe llamar internamente a: FirebaseAuth.instance.signInWithEmailAndPassword
+    
     bool loginExitoso = await _controladorUsuario.iniciarSesion(
       email: _emailController.text.trim(),
       password: _passwordController.text.trim(),
@@ -470,7 +464,7 @@ if (exito) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) => const MyHomePage(title: 'Sistema de Gestión Petroglifos'),
+          builder: (context) => const PaginaPrincipal(title: 'Sistema de Gestión Petroglifos'),
         ),
       );
     } else {
@@ -486,7 +480,7 @@ if (exito) {
 }
 
   void _procesarAutenticacion() {
-  // Validaciones rápidas antes de disparar Firebase
+  
   if (_emailController.text.trim().isEmpty || _passwordController.text.trim().isEmpty) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Por favor, rellena el correo y la contraseña.')),
@@ -494,7 +488,7 @@ if (exito) {
     return;
   }
 
-  // Bifurcamos el flujo según la pantalla activa
+  
   if (_esLogin) {
     _procesarLogin();
   } else {
@@ -506,7 +500,7 @@ if (exito) {
   try {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      if (!mounted) return; // <--- Validación de seguridad
+      if (!mounted) return;
       setState(() {
         _esAdmin = false;
         _esLogin = true;
@@ -515,21 +509,18 @@ if (exito) {
       return;
     }
 
-    // Esperamos la respuesta de la base de datos
+   
     final usuarioAnclado = await _controladorUsuario.buscarUsuario(user.uid);
 
-    if (!mounted) return; // <--- Doble seguridad después de un await pesado
+    if (!mounted) return; 
 
     if (usuarioAnclado != null) {
-      // Usamos .name si es un Enum, o lowercase directo si contiene texto
       final String rolStr = usuarioAnclado.rol.toString().toLowerCase();
 
       setState(() {
-        // CORRECCIÓN: Validamos de forma flexible si contiene la palabra 'administrador' o 'admin'
+        
         _esAdmin = rolStr.contains('administrador') || rolStr.contains('admin');
         
-        // REGLA: Si es admin -> muestra registro (_esLogin = false)
-        // Si NO es admin -> fuerza login (_esLogin = true)
         _esLogin = !_esAdmin; 
       });
     } else {
@@ -541,7 +532,6 @@ if (exito) {
   } catch (e) {
     print('Error al verificar privilegios de administrador: $e');
   } finally {
-    // El bloque finally siempre se ejecuta, también necesita protección
     if (mounted) {
       setState(() => _cargandoRol = false);
     }
@@ -576,7 +566,6 @@ if (exito) {
 
     rol: _rolSeleccionado,
 
-    // cualquier otro atributo que ya tenga tu modelo
   );
 
   final exito = await _controladorUsuario.actualizarUsuario(
@@ -666,11 +655,9 @@ if (exito) {
   setState(() => _guardando = true);
 
   try {
-    // 1. Generamos un ID único localmente si tu arquitectura lo requiere, 
-    // o bien puedes usar un ID aleatorio compatible con tu base de datos.
+  
     String nuevoIdBitacora = 'bit_${DateTime.now().millisecondsSinceEpoch}';
 
-    // 2. LLAMADA CENTRALIZADA: Guardamos invocando al controlador de negocio
     bool guardadoExitoso = await _controladorNegocio.registrarBitacora(
       id: nuevoIdBitacora,
       fechaInicio: _fechaInicioBitacora,
@@ -772,10 +759,9 @@ if (exito) {
   });
 
   try {
-    // 1. Buscamos las bitácoras por fecha límite usando el controlador de negocio
+    
     final bitacorasFiltradas = await _controladorNegocio.obtenerBitacorasPorFecha(_rangoFechaReporte);
     
-    // Extraemos únicamente los IDs en una lista de Strings
     List<String> idsBitacorasEncontradas = bitacorasFiltradas.map((b) => b.id).toList();
 
     if (idsBitacorasEncontradas.isEmpty) {
@@ -834,14 +820,13 @@ if (exito) {
 
     setState(() => _guardando = true);
 
-    // Generamos un ID único simple basado en el timestamp actual
     String idUnico = "SUG-${DateTime.now().millisecondsSinceEpoch}";
 
     bool exito = await _controladorSugerencia.registrarSugerencia(
       id: idUnico,
       descripcion: _descripcionSugerenciaController.text,
-      fecha: DateTime.now(), // Fecha actual del envío
-      estado: false,         // Por defecto inicia como falsa/pendiente de revisión
+      fecha: DateTime.now(), 
+      estado: false,         
     );
 
     setState(() => _guardando = false);
@@ -850,7 +835,7 @@ if (exito) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('¡Sugerencia registrada con éxito! Gracias por su aporte.')),
       );
-      _descripcionSugerenciaController.clear(); // Limpiamos el buffer
+      _descripcionSugerenciaController.clear(); 
       Navigator.pop(context);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -861,6 +846,10 @@ if (exito) {
   //=========================================================================
   //formularios 
   //=========================================================================
+  /*
+  lo que hacen estas funciones tipo widget es que construyen una pantalla 
+  segun lo que se quiera registrar
+  */
 
   Widget _construirFormularioPetroglifo() {
     bool esWindows = defaultTargetPlatform == TargetPlatform.windows;
@@ -1278,7 +1267,7 @@ if (exito) {
       ),
       const SizedBox(height: 20),
 
-      // ================= CAMPOS COMUNES =================
+      //=================CAMPOS COMUNES=================
       Card(
         elevation: 2,
         margin: const EdgeInsets.only(bottom: 12),
@@ -1308,7 +1297,7 @@ if (exito) {
         ),
       ),
       
-      // ================= CAMPOS DE REGISTRO =================
+      //=================CAMPOS DE REGISTRO=================
       if (!_esLogin) ...[
         Card(
           elevation: 2,
@@ -1372,7 +1361,6 @@ if (exito) {
 
       const SizedBox(height: 40),
 
-      // ================= BOTÓN PRINCIPAL / ESTADO DE CARGA =================
       _guardando
           ? Column(
               children: [
@@ -1397,7 +1385,6 @@ if (exito) {
 
       const SizedBox(height: 16),
 
-      // ================= ENLACE DINÁMICO (Conmuta Login/Registro) =================
       if (_esAdmin)
         TextButton(
           onPressed: () {
@@ -1411,11 +1398,9 @@ if (exito) {
           ),
         ),
 
-      // ================= NUEVO: BOTÓN CERRAR SESIÓN =================
-      // Si el usuario ya está autenticado (por ejemplo, en la vista de registro del administrador),
-      // añadimos un botón secundario limpio para salir del sistema.
+    
       if (!_esLogin || FirebaseAuth.instance.currentUser != null) ...[
-        const Divider(height: 32), // Línea divisoria elegante
+        const Divider(height: 32), 
         OutlinedButton.icon(
           style: OutlinedButton.styleFrom(
             padding: const EdgeInsets.all(16),
@@ -1425,7 +1410,7 @@ if (exito) {
           icon: const Icon(Icons.logout_rounded),
           label: const Text('Cerrar Sesión Activa', style: TextStyle(fontSize: 16)),
           onPressed: () async {
-            // Mostrar un indicador de carga rápido en consola o UI si fuese necesario
+           
             bool exito = await _controladorUsuario.cerrarSesion();
             if (exito && context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -1434,7 +1419,7 @@ if (exito) {
                   backgroundColor: Colors.green,
                 ),
               );
-              // Forzamos el cambio visual a la pantalla de login por defecto si queda ahí pegado
+              
               setState(() {
                 _esLogin = true;
               });

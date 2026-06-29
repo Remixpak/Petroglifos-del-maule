@@ -4,7 +4,10 @@ class ArchivoMultimedia {
   String _nombreArchivo;
   String _tipoArchivo;
   String _rutaArchivo;//REVISAR ESTO YA QUE NO ME ACUERDO SI ERA NECESARIO
-  //bool visibilidad en bola si se pone
+  /*no era necesario pero si lo quito se rompe todo y que lata ir archivo por archivo
+  cambiando cosas que en una de esas termina rompiendo mas cosas
+  */
+  //bool visibilidad en una de esas si se pone
 
   String get id => _id;
   String get nombreArchivo => _nombreArchivo;

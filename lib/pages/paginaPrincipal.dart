@@ -13,15 +13,15 @@ import 'package:software_petroglifos/pages/pantallaReportes.dart';
 import 'package:software_petroglifos/pages/panelUsuarios.dart';
 import 'package:software_petroglifos/pages/pantallaSugerencia.dart';
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
+class PaginaPrincipal extends StatefulWidget {
+  const PaginaPrincipal({super.key, required this.title});
   final String title;
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<PaginaPrincipal> createState() => _PaginaPrincipalState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
+class _PaginaPrincipalState extends State<PaginaPrincipal> {
   final ControladorGestionArqueologica _controlador = ControladorGestionArqueologica();
   final ControladorUsuario _controladorUsuario = ControladorUsuario(); // <-- Instanciado para validar cuenta activa
   final TextEditingController _busquedaController = TextEditingController();
@@ -73,13 +73,11 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void _irASugerencias({required bool esUsuarioActivo}) {
     if (esUsuarioActivo) {
-      // Si el investigador está autenticado y activo, va al panel de gestión
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const PantallaSugerencia()),
       );
     } else {
-      // Si es un usuario anónimo o público, va directo al formulario de registro en el buzón
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -131,17 +129,16 @@ void _limpiarBusqueda() {
       builder: (context, authSnapshot) {
         final bool tieneSesionAuth = authSnapshot.hasData && authSnapshot.data != null;
 
-        // Usamos un FutureBuilder secundario para validar si el usuario autenticado está activo en Firestore
         return FutureBuilder<Usuario?>(
           future: tieneSesionAuth 
               ? _controladorUsuario.buscarUsuario(authSnapshot.data!.uid)
               : Future.value(null),
           builder: (context, usuarioSnapshot) {
             
-            // Evaluamos la regla de negocio: Tiene sesión de Firebase Y además su bandera de estado es verdadera
+            
             final bool estaLogeadoYActivo = tieneSesionAuth && 
-                                           usuarioSnapshot.data != null && 
-                                           (usuarioSnapshot.data!.isActive == true); // Ajusta a '.isActive' si cambiaste el nombre en tu modelo
+            usuarioSnapshot.data != null && 
+            (usuarioSnapshot.data!.isActive == true);
 
             return Scaffold(
               appBar: AppBar(
@@ -301,7 +298,7 @@ void _limpiarBusqueda() {
                 selectedIndex: _indiceActual,
                 onDestinationSelected: (int index) {
   if (estaLogeadoYActivo) {
-    // Si está activo, maneja el índice normalmente
+    
     setState(() {
       _indiceActual = index;
     });
@@ -328,9 +325,7 @@ void _limpiarBusqueda() {
       setState(() => _indiceActual = 0);
     }
   } else {
-    // Si es un usuario PÚBLICO:
-    // NO actualizamos _indiceActual con el valor 'index' si presionó el 1,
-    // así evitamos que rompa el rango de los 2 botones disponibles (0 y 1).
+    
     switch (index) {
       case 0:
         setState(() {
@@ -339,13 +334,13 @@ void _limpiarBusqueda() {
         print("Se mantiene en la pantalla de Inicio pública.");
         break;
       case 1:
-        // Se ejecuta la navegación externa manteniendo el índice visual fijo en 0
+        
         _irASugerencias(esUsuarioActivo: estaLogeadoYActivo);
         break;
     }
   }
 },
-                // MODIFICACIÓN: Modificación dinámica de los ítems disponibles según la bandera combinada
+                
                 destinations: estaLogeadoYActivo
                     ? const [
                         NavigationDestination(

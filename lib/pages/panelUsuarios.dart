@@ -41,24 +41,24 @@ class _PanelUsuariosState extends State<PanelUsuarios> {
     final double width = MediaQuery.of(context).size.width;
     final double paddingHorizontal = width > 800 ? width * 0.15 : 12.0;
 
-    // 1. OBTENEMOS EL UID DEL USUARIO ACTUAL LOGEADO
+   
     final String? uidUsuarioActual = FirebaseAuth.instance.currentUser?.uid;
 
     return FutureBuilder<Usuario?>(
-      // Buscamos el perfil completo del usuario conectado para conocer su Rol
+      
       future: uidUsuarioActual != null 
           ? _controladorUsuario.buscarUsuario(uidUsuarioActual) 
           : Future.value(null),
       builder: (context, usuarioActualSnapshot) {
         
-        // Mientras carga el rol del usuario actual, mostramos una pantalla de carga limpia
+       
         if (usuarioActualSnapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator(color: Colors.indigo)),
           );
         }
 
-        // Evaluamos si el usuario conectado es Administrador
+       
         final Usuario? usuarioActual = usuarioActualSnapshot.data;
         final bool esUsuarioActualAdmin = usuarioActual?.rol == Rol.administrador;
 

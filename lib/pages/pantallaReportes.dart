@@ -17,9 +17,8 @@ class PantallaReporte extends StatefulWidget {
 class _PantallaReporteState extends State<PantallaReporte> {
   final _controlador = ControladorGestionArqueologica();
   final _controladorUsuario = ControladorUsuario();
-  final _controladorPDF = ControladorGeneracionPDF(); // <-- Instancia del controlador de PDF
+  final _controladorPDF = ControladorGeneracionPDF();
 
-  // Mapa para controlar de manera independiente el estado de carga/descarga de cada PDF usando su ID
   final Map<String, bool> _exportandoPDFs = {};
 
   void _irARegistroReporte() {
@@ -31,12 +30,11 @@ class _PantallaReporteState extends State<PantallaReporte> {
     );
   }
 
-  // MÉTODO NUEVO: Orquesta la descarga asíncrona del Reporte Técnico
   Future<void> _descargarReportePDF(ReporteTecnico reporte) async {
     setState(() => _exportandoPDFs[reporte.id] = true);
 
     try {
-      // Disparamos la generación y posterior guardado nativo multiplataforma (Android/Windows)
+      
       await _controladorPDF.descargarPDF(
         _controladorPDF.generarReporteTecnico(reporte.id),
         "Reporte_Tecnico_${reporte.id}",
@@ -106,7 +104,6 @@ class _PantallaReporteState extends State<PantallaReporte> {
               final String fechaGenFormateada = DateFormat('dd/MM/yyyy HH:mm').format(reporte.fechaGeneracion);
               final String rangoFormateado = DateFormat('dd/MM/yyyy').format(reporte.rangoFecha);
               
-              // Verificamos si esta tarjeta específica está procesando su descarga
               bool estaDescargando = _exportandoPDFs[reporte.id] ?? false;
 
               return Card(
@@ -123,7 +120,7 @@ class _PantallaReporteState extends State<PantallaReporte> {
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                     ),
                     subtitle: Text('Rango de cobertura: $rangoFormateado'),
-                    // NUEVA SECCIÓN: Botón interactivo integrado en el extremo derecho de la fila
+                    
                     trailing: estaDescargando
                         ? const SizedBox(
                             width: 24,

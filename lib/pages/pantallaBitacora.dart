@@ -32,7 +32,7 @@ class _PantallaListarBitacorasState extends State<PantallaListarBitacoras> {
   );
 }
 
-  // Helper para formatear la fecha y hora de manera legible (Ej: 24/06/2026 14:30)
+  //helper para formatear la fecha y hora de manera legible (Ej: 24/06/2026 14:30)
   String _formatearFecha(DateTime fecha) {
     final dia = fecha.day.toString().padLeft(2, '0');
     final mes = fecha.month.toString().padLeft(2, '0');
@@ -44,7 +44,6 @@ class _PantallaListarBitacorasState extends State<PantallaListarBitacoras> {
 
   @override
   Widget build(BuildContext context) {
-    // Ajuste de padding dinámico idéntico al de sitios para monitores o PC
     final double width = MediaQuery.of(context).size.width;
     final double paddingHorizontal = width > 800 ? width * 0.15 : 12.0;
 
@@ -53,7 +52,7 @@ class _PantallaListarBitacorasState extends State<PantallaListarBitacoras> {
         title: const Text('Bitácoras de Terreno'),
       ),
       body: StreamBuilder<List<Bitacora>>(
-        // Usamos la colección genérica o el método específico que implementemos en tu controlador
+       
         stream: _controlador.listarBitacoras(), 
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -89,17 +88,14 @@ class _PantallaListarBitacorasState extends State<PantallaListarBitacoras> {
                   borderRadius: BorderRadius.circular(12),
                   child: ExpansionTile(
                     backgroundColor: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.1),
-                    leading: const Icon(Icons.book_rounded, color: Colors.brown),
-                    
-                    // TÍTULO PRINCIPAL: Actividad realizada
+                    leading: const Icon(Icons.book_rounded, color: Colors.brown),            
                     title: Text(
                       bitacora.actividad,
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                     ),
-                    // SUBTÍTULO: Fecha de inicio de la jornada
+                  
                     subtitle: Text('Inicio: ${_formatearFecha(bitacora.fechaInicio)}'),
-                    
-                    // CONTENIDO EXTENDIDO DESPLEGABLE
+              
                     children: [
                       Padding(
                         padding: const EdgeInsets.all(16.0),
@@ -119,7 +115,6 @@ class _PantallaListarBitacorasState extends State<PantallaListarBitacoras> {
                             ),
                             const SizedBox(height: 14),
                             
-                            // SUB-LISTA DE PARTICIPANTES (IDs)
                             const Row(
                               children: [
                                 Icon(Icons.people_alt_rounded, size: 18, color: Colors.blueGrey),
@@ -184,9 +179,7 @@ Align(
         },
       ),
 
-      // BOTÓN FLOTANTE PARA REGISTRAR NUEVA BITÁCORA
       floatingActionButton: FloatingActionButton(
-        //onPressed: _irARegistroBitacora,
         onPressed: () {
           _irARegistroBitacora();
         },
