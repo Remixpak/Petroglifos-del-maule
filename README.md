@@ -17,6 +17,6 @@ For help getting started with Flutter development, view the
 samples, guidance on mobile development, and a full API reference.
 
 ## Descarga la app para android
-[Descargar APK](https://github.com/Remixpak/Petroglifos-del-maule/releases/tag/Prototipo)
+[Descargar APK](https://github.com/Remixpak/Petroglifos-del-maule/releases/tag/Android)
 ## Descarga la app para windows
 [Descargar instalador](https://github.com/Remixpak/Petroglifos-del-maule/releases/tag/Windows)
