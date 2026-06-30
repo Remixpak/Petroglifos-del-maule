@@ -126,7 +126,7 @@ class _DetallePetroglifoState extends State<DetallePetroglifo> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Registro Visual (Transformación de Ronald)',
+              'Registro Visual',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.teal),
             ),
             const SizedBox(height: 10),
