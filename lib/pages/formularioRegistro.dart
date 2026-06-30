@@ -1239,7 +1239,6 @@ if (exito) {
   }
 
   Widget _construirFormularioAutenticacion() {
-  // Instancia del controlador de usuario (asegúrate de tenerla definida o impórtala)
   final ControladorUsuario _controladorUsuario = ControladorUsuario();
 
   if (_cargandoRol) {
