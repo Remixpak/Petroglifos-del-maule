@@ -1379,7 +1379,15 @@ if (exito) {
                 foregroundColor: Colors.white,
               ),
               icon: Icon(_esLogin ? Icons.login_rounded : Icons.person_add_alt_1_rounded),
-              onPressed: widget.usuarioEditar != null? _procesarEdicionUsuario: _procesarGuardadoUsuario,
+              onPressed: () {
+                if (widget.usuarioEditar != null) {
+                  _procesarEdicionUsuario();
+                } else if (_esLogin) {
+                  _procesarAutenticacion();
+                } else {
+                  _procesarGuardadoUsuario();
+                }
+              },
               label: Text(_esLogin ? 'Iniciar Sesión' : 'Registrar Investigador', style: const TextStyle(fontSize: 16)),
             ),
 
